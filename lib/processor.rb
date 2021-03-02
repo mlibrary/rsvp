@@ -130,13 +130,13 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   # Alter @status by discarding failed stage and anything after it.
-  def discard_failure
+  def discard_failure # rubocop:disable Metrics/AbcSize
     have_error = false
     stages.each do |stage|
-      if @status[:stages][stage.name]
-        have_error ||= @status[:stages][stage.name][:errors]&.any?
+      if @status[:stages][stage.name.to_sym]
+        have_error ||= @status[:stages][stage.name.to_sym][:errors]&.any?
       end
-      @status[:stages].delete stage.name if have_error
+      @status[:stages].delete stage.name.to_sym if have_error
     end
   end
 

@@ -85,4 +85,29 @@ class PreflightTest < Minitest::Test
            'stage warns about removed .DS_Store')
     refute(File.exist?(thumbs), 'Thumbs.db file removed')
   end
+
+  def test_barcode_directory_errors_and_warnings # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    shipment = TestShipment.new(test_name, 'BC F spurious_file')
+    checksum_md5 = File.join(shipment.dir, shipment.barcodes[0], 'checksum.md5')
+    FileUtils.touch(checksum_md5)
+    Dir.mkdir(File.join(shipment.dir, shipment.barcodes[0], 'spurious_d'))
+    stage = Preflight.new(shipment.dir, {}, @options)
+    stage.run
+    assert(stage.errors.any?(/spurious_file/),
+           'stage fails with unknown file')
+    assert(stage.errors.any?(/spurious_d/),
+           'stage fails with barcode subdirectory')
+    assert(stage.warnings.any?(/md5\signored/),
+           'stage warns about ignored checksum.md5 file')
+  end
+
+  def test_shipment_directory_errors
+    shipment = TestShipment.new(test_name, 'F spurious_file')
+    stage = Preflight.new(shipment.dir, {}, @options)
+    stage.run
+    assert(stage.errors.any?(/no\sbarcode\sdirectories/),
+           'stage fails with no barcode directories')
+    assert(stage.errors.any?(/spurious_file/),
+           'stage fails with unknown file')
+  end
 end

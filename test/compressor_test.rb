@@ -45,6 +45,18 @@ class CompressorTest < Minitest::Test
                  'TIFF DateTime in %Y:%m:%d %H:%M:%S format')
   end
 
+  def test_set_jp2_date_time
+    shipment = TestShipment.new(test_name, 'BC T contone 1')
+    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    `tiffset -s 306 '2000:11:11 11:11:11' #{tiff}`
+    stage = Compressor.new(shipment.dir, {}, @options)
+    stage.run
+    jp2 = File.join(shipment.dir, shipment.barcodes[0], '00000001.jp2')
+    exif_data = `exiftool #{jp2}`
+    assert_match(%r{Date/Time\sModified\s*:\s*2000:11:11\s11:11:11}, exif_data,
+                 'JP2 DateTime in %Y:%m:%d %H:%M:%S format')
+  end
+
   def test_16bps_fails
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
