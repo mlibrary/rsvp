@@ -5,11 +5,11 @@ services:
     build: .
     volumes:
       - .:/usr/src/app
-      - gem_cache:/gems
-    command: "bundle exec rake test"
-    deploy:
-      restart_policy:
-        condition: none
+    command: bash -c "bundle exec rake test && bundle exec rubocop"
+    volumes:
+      - type: bind
+        source: '.'
+        target: '/usr/src/app'
 
 volumes:
   gem_cache:

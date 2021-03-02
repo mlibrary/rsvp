@@ -28,15 +28,16 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     @move_on_success = [] # [src, dest] pairs, deletes if dest is nil
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
     tiff_files.each_with_index do |file, i|
       metadata = tiffinfo(file)
       next if metadata.nil?
 
       # Figure out what sort of image this is.
-      m = metadata.match(%r{Bits\/Sample:\s(\d+)})
+      m = metadata.match(%r{Bits/Sample:\s(\d+)})
       bps = m[1].to_i
-      if bps == 8
+      case bps
+      when 8
         # It's a contone, so we convert to JP2.
         write_progress(i, tiff_files.count, "converting #{file} to JPEG 2000")
         begin
@@ -44,7 +45,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         rescue CompressorError => e
           @errors << e.message
         end
-      elsif bps == 1
+      when 1
         # It's bitonal, so we G4 compress it.
         write_progress(i, tiff_files.count, "compressing #{file} with Group4")
         begin
@@ -88,7 +89,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     stdout_str
   end
 
-  def handle_8_bps_conversion(file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_8_bps_conversion(file, metadata) # rubocop:disable Metrics/MethodLength
     tmpdir = create_tempdir
     sparse = File.join(tmpdir, 'sparse.tif')
     new_image = File.join(tmpdir, 'new.jp2')
@@ -324,7 +325,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
   end
 
   # Remove ImageMagick software tag (if it exists) and replace with original
-  def write_tiff_software(path, software) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def write_tiff_software(path, software) # rubocop:disable Metrics/MethodLength
     cmd = "exiftool -IFD0:Software= -overwrite_original #{path}"
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?

@@ -9,7 +9,7 @@ class TIFFValidator < Stage
   BITONAL_RES = '600'
   CONTONE_RES = '400'
 
-  def run # rubocop:disable Metrics/AbcSize
+  def run
     cmd = "find #{@dir} -name '*.tif' -type f | sort"
     files = `#{cmd}`.split("\n")
     files.each_with_index do |file, i|
@@ -81,9 +81,9 @@ class TIFFValidator < Stage
     h[:xres] = m[1]
     h[:yres] = m[2]
     h[:res_unit] = m[3]
-    m = info.match(%r{Bits\/Sample:\s(\d+)})
+    m = info.match(%r{Bits/Sample:\s(\d+)})
     h[:bps] = m[1]
-    m = info.match(%r{Samples\/Pixel:\s(\d+)})
+    m = info.match(%r{Samples/Pixel:\s(\d+)})
     h[:spp] = m[1]
     h
   end

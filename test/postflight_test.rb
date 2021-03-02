@@ -30,7 +30,7 @@ class PostflightTest < Minitest::Test
     assert_equal(0, stage.errors.count, 'stage runs without errors')
   end
 
-  def test_metadata_mismatch_removed # rubocop:disable Metrics/AbcSize
+  def test_metadata_mismatch_removed
     spec = 'BC T bitonal 1 BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
     metadata = { barcodes: shipment.barcodes.clone }
@@ -42,7 +42,7 @@ class PostflightTest < Minitest::Test
                  'stage gripes about removed barcode')
   end
 
-  def test_metadata_mismatch_added # rubocop:disable Metrics/AbcSize
+  def test_metadata_mismatch_added
     spec = 'BC T bitonal 1 BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
     metadata = { barcodes: shipment.barcodes.clone }
