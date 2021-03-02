@@ -1,4 +1,5 @@
 # RSVP
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/mlibrary/rsvp/Run%20CI)
 ## Ruby SIP Validation and Processing
 
 ## Initial setup
