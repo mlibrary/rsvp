@@ -20,7 +20,8 @@ $ docker-compose build
 ### 3. Running tests
 
 ```
-$ docker-compose run test
+$ docker-compose run --rm test
+$ docker-compose run --rm test bundle exec rubocop
 ```
 
 or
