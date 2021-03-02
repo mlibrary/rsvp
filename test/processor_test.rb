@@ -5,6 +5,10 @@ require 'minitest/autorun'
 require 'processor'
 
 class ProcessorTest < Minitest::Test
+  def teardown
+    TestShipment.remove_test_shipments
+  end
+
   def test_new # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, '')
     processor = Processor.new(shipment.dir, {})

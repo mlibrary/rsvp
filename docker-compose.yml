@@ -5,7 +5,7 @@ services:
     build: .
     volumes:
       - .:/usr/src/app
-    command: bash -c "bundle exec rake test && bundle exec rubocop"
+    command: bundle exec rake test
     volumes:
       - type: bind
         source: '.'
