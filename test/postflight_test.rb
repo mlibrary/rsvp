@@ -27,7 +27,7 @@ class PostflightTest < Minitest::Test
     metadata = { barcodes: shipment.barcodes.clone }
     stage = Postflight.new(shipment.dir, metadata, @options)
     stage.run
-    assert_equal(0, stage.errors.count, 'stage runs without errors')
+    assert_equal 0, stage.errors.count, 'stage runs without errors'
   end
 
   def test_metadata_mismatch_removed
@@ -37,9 +37,7 @@ class PostflightTest < Minitest::Test
     metadata[:barcodes] << TestShipment.generate_barcode
     stage = Postflight.new(shipment.dir, metadata, @options)
     stage.run
-    assert_equal(1, stage.errors.count, 'stage generates a metadata error')
-    assert_match(/removed/, stage.errors[0],
-                 'stage gripes about removed barcode')
+    assert stage.errors.any?(/removed/), 'stage gripes about removed barcode'
   end
 
   def test_metadata_mismatch_added
@@ -49,7 +47,18 @@ class PostflightTest < Minitest::Test
     metadata[:barcodes].pop
     stage = Postflight.new(shipment.dir, metadata, @options)
     stage.run
-    assert_equal(1, stage.errors.count, 'stage generates a metadata error')
-    assert_match(/added/, stage.errors[0], 'stage gripes about removed barcode')
+    assert stage.errors.any?(/added/), 'stage gripes about added barcode'
+  end
+
+  def test_feed_validate_error
+    ENV['FAKE_FEED_VALIDATE_FAIL'] = '1'
+    spec = 'BC T bitonal 1 T contone 2'
+    shipment = TestShipment.new(test_name, spec)
+    metadata = { barcodes: shipment.barcodes.clone }
+    stage = Postflight.new(shipment.dir, metadata, @options)
+    stage.run
+    assert stage.errors.any?(/something\swent\swrong/),
+           'error(s) from feed validate'
+    ENV.delete 'FAKE_FEED_VALIDATE_FAIL'
   end
 end

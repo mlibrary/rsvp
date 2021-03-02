@@ -7,4 +7,10 @@ my $namespace = shift;
 my $dir = shift;
 my $objid = shift;
 
-print "success!\n";
+if ($ENV{FAKE_FEED_VALIDATE_FAIL}) {
+  print "something went wrong\n";
+  print "failed!\n";
+}
+else {
+  print "success!\n";
+}

@@ -32,6 +32,15 @@ class ProcessorTest < Minitest::Test
                  'has custom feed validate path')
   end
 
+  def test_unlink_status_on_reset
+    shipment = TestShipment.new(test_name, '')
+    status_json = File.join(shipment.dir, 'status.json')
+    FileUtils.touch(status_json)
+    options = { restart_all: 1 }
+    Processor.new(shipment.dir, options)
+    refute File.exist?(status_json), 'status.json deleted on reset'
+  end
+
   def test_stages
     shipment = TestShipment.new(test_name, '')
     processor = Processor.new(shipment.dir)
@@ -69,5 +78,31 @@ class ProcessorTest < Minitest::Test
     FileUtils.touch(status_json)
     assert_raises(JSON::ParserError) { Processor.new(shipment.dir, {}) }
     assert_equal(File.size(status_json), 0, 'status.json is unmodified')
+  end
+
+  def test_discard_failure
+    spec = 'BC T bad_16bps 1'
+    shipment = TestShipment.new(test_name, spec)
+    processor = Processor.new(shipment.dir, {})
+    capture_io do
+      processor.run
+    end
+    keys_before = processor.status[:stages].keys.count
+    processor.send :discard_failure
+    keys_after = processor.status[:stages].keys.count
+    assert(keys_after < keys_before, 'discard_errors removes failing stage')
+  end
+
+  def test_report_stage_error_long
+    shipment = TestShipment.new(test_name, 'BC T bad_16bps 1-20')
+    processor = Processor.new(shipment.dir, {})
+    out, _err = capture_io do
+      processor.run
+    end
+    assert_match(/and\s\d+\smore/, out, 'long stage error report truncated')
+    out, _err = capture_io do
+      processor.query
+    end
+    refute_match(/and\s\d+\smore/, out, 'long stage error report from query')
   end
 end

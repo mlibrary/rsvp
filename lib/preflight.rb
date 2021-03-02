@@ -25,7 +25,7 @@ class Preflight < Stage
 
   def run
     validate_shipment_directory
-    @errors << "no barcode directories in #{dir}" if @metadata[:barcodes].none?
+    @errors << "no barcode directories in #{@dir}" if @metadata[:barcodes].none?
     @metadata[:barcodes].each_with_index do |barcode, i|
       unless Luhn.valid? barcode
         @warnings << "Luhn checksum failed for barcode #{barcode}"
