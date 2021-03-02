@@ -1,0 +1,7 @@
+# frozen_string_literal: true
+
+task default: :test
+task :test do
+  require_relative 'test/test_helper.rb'
+  Dir.glob('./test/*_test.rb').sort.each { |file| require file }
+end

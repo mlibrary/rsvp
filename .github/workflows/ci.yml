@@ -1,0 +1,25 @@
+name: Run CI
+
+on:
+  push:
+    branches:
+      - $default-branch
+
+  pull_request:
+
+jobs:
+  # Run tests
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up tests
+        run: docker-compose build
+
+      - name: Run rubocop
+        run: docker-compose run test bundle exec rubocop
+
+      - name: Run tests
+        run: docker-compose run test

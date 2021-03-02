@@ -1,0 +1,1 @@
+feed_validate_script: 'test/bin/fake_feed_validate.pl'
