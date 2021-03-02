@@ -23,7 +23,7 @@ class Preflight < Stage
     @tiff_regex = /^\d{8}\.tif$/
   end
 
-  def run # rubocop:disable Metrics/AbcSize
+  def run
     validate_shipment_directory
     @errors << "no barcode directories in #{dir}" if @metadata[:barcodes].none?
     @metadata[:barcodes].each_with_index do |barcode, i|
@@ -40,7 +40,7 @@ class Preflight < Stage
 
   # A shipment directory is valid if it contains only barcode directories
   # and status.json
-  def validate_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def validate_shipment_directory # rubocop:disable Metrics/MethodLength
     Dir.entries(@dir).sort.each do |entry|
       next if %w[. ..].include? entry
       next if entry == 'status.json'

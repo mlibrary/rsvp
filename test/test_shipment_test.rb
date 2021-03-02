@@ -51,7 +51,7 @@ class TestShipmentTest < Minitest::Test
            "barcode #{shipment.barcodes[0]} invalid"
   end
 
-  def test_generate_test_shipment_tiff_files # rubocop:disable Metrics/AbcSize
+  def test_generate_test_shipment_tiff_files
     spec = 'BC T bitonal 1 F empty.txt'
     name = [self.class.to_s, __method__.to_s].join '_'
     shipment = TestShipment.new(name, spec)

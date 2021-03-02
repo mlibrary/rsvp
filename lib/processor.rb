@@ -37,7 +37,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def config # rubocop:disable Metrics/AbcSize
+  def config
     return @config unless @config.nil?
 
     config_dir = File.expand_path('../config', __dir__)
@@ -178,12 +178,13 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   # Based on https://gist.github.com/Integralist/9503099
-  def symbolize(obj)
-    if obj.is_a? Hash
+  def symbolize(obj) # rubocop:disable Metrics/MethodLength
+    case obj
+    when Hash
       return obj.each_with_object({}) do |(k, v), memo|
         memo.tap { |m| m[k.to_sym] = symbolize(v) }
       end
-    elsif obj.is_a? Array
+    when Array
       return obj.each_with_object([]) do |v, memo|
         memo << symbolize(v)
       end

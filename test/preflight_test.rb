@@ -62,7 +62,7 @@ class PreflightTest < Minitest::Test
     refute(File.exist?(thumbs), 'Thumbs.db file removed')
   end
 
-  def test_remove_toplevel_ds_store # rubocop:disable Metrics/AbcSize
+  def test_remove_toplevel_ds_store
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
     ds_store = File.join(shipment.dir, '.DS_Store')
     FileUtils.touch(ds_store)
@@ -74,7 +74,7 @@ class PreflightTest < Minitest::Test
     refute(File.exist?(ds_store), '.DS_Store file removed')
   end
 
-  def test_remove_toplevel_thumbs_db # rubocop:disable Metrics/AbcSize
+  def test_remove_toplevel_thumbs_db
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
     thumbs = File.join(shipment.dir, 'Thumbs.db')
     FileUtils.touch(thumbs)

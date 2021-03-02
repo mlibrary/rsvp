@@ -40,19 +40,19 @@ class PaginationCheck < Stage
 
   # Given sorted pages array of integers from 1 to n inclusive,
   # returns array of integer and integer range strings missing from list
-  def missing_pages(pages) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def missing_pages(pages) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     missing = (1..pages.max).to_a - pages
     ranges = []
     missing.each do |m|
-      if ranges[-1].class == Integer && ranges[-1] == m - 1
+      if ranges[-1].instance_of?(Integer) && ranges[-1] == m - 1
         ranges[-1] = [ranges[-1], m]
-      elsif ranges[-1].class == Array && ranges[-1][-1] == m - 1
+      elsif ranges[-1].instance_of?(Array) && ranges[-1][-1] == m - 1
         ranges[-1] << m
       else
         ranges << m
       end
     end
-    ranges.map { |r| r.class == Array ? "#{r[0]}-#{r[-1]}" : r.to_s }
+    ranges.map { |r| r.instance_of?(Array) ? "#{r[0]}-#{r[-1]}" : r.to_s }
   end
 
   # Given sorted pages array of integers from 1 to n inclusive,

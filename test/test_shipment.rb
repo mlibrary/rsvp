@@ -24,7 +24,7 @@ class TestShipment
 
   # Randomly-generated barcode that passes Luhn check
   def self.generate_barcode(valid = true)
-    barcode = '39015' + (8.times.map { rand 10 }).join('')
+    barcode = '39015' + (8.times.map { rand 10 }).join
     if valid
       barcode + Luhn.checksum(barcode).to_s
     else
@@ -93,10 +93,11 @@ class TestShipment
 
   def handle_tiff_op(name, dest) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     fixture = Fixtures.tiff_fixture(name)
-    if /^\d+$/.match? dest
+    case dest
+    when /^\d+$/
       dest = format '%<filename>08d.tif', { filename: dest }
       FileUtils.cp fixture, File.join(@current_dir, dest)
-    elsif /^\d+-\d+$/.match? dest
+    when /^\d+-\d+$/
       first, last = dest.split('-').map(&:to_i)
       raise "Ill-formed TIFF file range #{match[1]}-#{match[2]}" if first > last
 
@@ -111,10 +112,11 @@ class TestShipment
 
   def handle_jp2_op(name, dest) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     fixture = Fixtures.jp2_fixture(name)
-    if /^\d+$/.match? dest
+    case dest
+    when /^\d+$/
       dest = format '%<filename>08d.jp2', { filename: dest }
       FileUtils.cp fixture, File.join(@current_dir, dest)
-    elsif /^\d+-\d+$/.match? dest
+    when /^\d+-\d+$/
       first, last = dest.split('-').map(&:to_i)
       raise "Ill-formed JP2 file range #{match[1]}-#{match[2]}" if first > last
 
