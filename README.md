@@ -11,6 +11,13 @@ $ cd rsvp
 $ bundle install
 ```
 
+On a server to which you do not have root access, this may be preferable:
+
+```
+mkdir -p vendor/bundle
+bundle install --path vendor/bundle
+```
+
 ### 2. Set up Docker development
 
 ```

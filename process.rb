@@ -5,7 +5,7 @@ require 'optparse'
 require 'pathname'
 require 'json'
 require 'byebug'
-require 'YAML'
+require 'yaml'
 
 APP_ROOT = File.expand_path(__dir__)
 $LOAD_PATH << File.join(APP_ROOT, 'lib')
