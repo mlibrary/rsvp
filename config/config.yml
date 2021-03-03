@@ -1,4 +1,4 @@
-feed_validate_script: 'l/local/feed/bin/validate_images.pl'
+feed_validate_script: '/l/local/feed/bin/validate_images.pl'
 stages:
   - name: Preflight
     class: Preflight
