@@ -50,4 +50,14 @@ class StageTest < Minitest::Test
     stage.cleanup
     refute File.exist?(tempdir), 'tempdir deleted by #cleanup'
   end
+
+  def test_cleanup_delete_on_success
+    shipment = TestShipment.new(test_name, 'BC')
+    stage = Stage.new(shipment.dir, {}, {})
+    temp = File.join(shipment.dir, shipment.barcodes[0], 'temp.txt')
+    FileUtils.touch(temp)
+    stage.delete_on_success temp
+    stage.cleanup
+    refute File.exist?(temp), 'file deleted by #delete_on_success'
+  end
 end

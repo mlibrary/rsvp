@@ -23,11 +23,6 @@ end
 
 # TIFF to JP2/TIFF compression stage
 class Compressor < Stage # rubocop:disable Metrics/ClassLength
-  def initialize(dir, metadata, options)
-    super
-    @move_on_success = [] # [src, dest] pairs, deletes if dest is nil
-  end
-
   def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
     tiff_files.each_with_index do |file, i|
       metadata = tiffinfo(file)

@@ -28,8 +28,7 @@ class TIFFValidator < Stage
   def run_tiffinfo(path) # rubocop:disable Metrics/MethodLength
     cmd = "tiffinfo #{path}"
     stdout_str, stderr_str, code = Open3.capture3(cmd)
-    @errors << "'#{cmd}' exited with status #{code}" if code.exitstatus != 0
-    if code != 0
+    if code.exitstatus != 0
       @errors << "Command '#{cmd}' exited with status #{code.exitstatus}"
     end
     stderr_str.chomp.split("\n").each do |err|
@@ -67,7 +66,7 @@ class TIFFValidator < Stage
           "#{file}\t#{info[:xres]}x#{info[:yres]} contone"
         end
       else
-        "#{file}\tCan't have SPP #{info[:spp]} with BPS 8"
+        "#{file}\tCan't have SPP #{info[:spp]} with 8 BPS"
       end
     else
       "#{file}\tCan't have BPS #{info[:bps]}"

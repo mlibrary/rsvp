@@ -36,7 +36,7 @@ class TIFFValidatorTest < Minitest::Test
   end
 
   def test_pixelspercentimeter_fails
-    spec = 'BC T bad_16bps 1'
+    spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
     stage = TIFFValidator.new(shipment.dir, {}, @options)
     tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
@@ -44,5 +44,49 @@ class TIFFValidatorTest < Minitest::Test
     stage.run
     assert(stage.errors.any?(%r{pixels/cm}),
            'PixelsPerCentimeter TIFF rejected')
+  end
+
+  def test_bitonal_3spp_fails
+    spec = 'BC T bitonal 1'
+    shipment = TestShipment.new(test_name, spec)
+    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    `tiffset -s 277 '3' #{tiff}`
+    stage.run
+    assert(stage.errors.any?(/SPP\s3\swith\s1\sBPS/i),
+           '1 BPS 3 SPP TIFF rejected')
+  end
+
+  def test_bitonal_resolution_fails
+    spec = 'BC T bitonal 1'
+    shipment = TestShipment.new(test_name, spec)
+    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
+    stage.run
+    assert(stage.errors.any?(/100x100\sbitonal/),
+           '100x100 bitonal TIFF rejected')
+  end
+
+  def test_contone_2spp_fails
+    spec = 'BC T contone 1'
+    shipment = TestShipment.new(test_name, spec)
+    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    `tiffset -s 277 '2' #{tiff}`
+    stage.run
+    assert(stage.errors.any?(/SPP\s2\swith\s8\sBPS/i),
+           '8 BPS 2 SPP TIFF rejected')
+  end
+
+  def test_contone_resolution_fails
+    spec = 'BC T contone 1'
+    shipment = TestShipment.new(test_name, spec)
+    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
+    stage.run
+    assert(stage.errors.any?(/100x100\scontone/),
+           '100x100 contone TIFF rejected')
   end
 end
