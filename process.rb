@@ -22,14 +22,16 @@ options_data = [['-c', '--config-dir', :config_dir,
                  'Reset and try last failed stage'],
                 ['-R', '--restart-all', :restart_all,
                  'Discard status.json and restart all stages'],
-                ['-sSCANNER', '--scanner=SCANNER', :scanner,
-                 'Set scanner tag to SCANNER'],
-                ['-SSOFTWARE', '--software=SOFTWARE', :software,
-                 'Set scan software tag to SOFTWARE'],
                 ['-v', '--verbose', :verbose,
                  'Run verbosely'],
                 ['-1', '--one-stage', :one_stage,
-                 'Run one stage and then stop']]
+                 'Run one stage and then stop'],
+                [:OPTIONAL, '--tagger-scanner=SCANNER', :tagger_scanner,
+                 'Set scanner tag to SCANNER'],
+                [:OPTIONAL, '--tagger-software=SOFTWARE', :tagger_software,
+                 'Set scan software tag to SOFTWARE'],
+                [:OPTIONAL, '--tagger-artist=ARTIST', :tagger_artist,
+                 'Set artist tag to ARTIST']]
 options = {}
 
 OptionParser.new do |opts|
