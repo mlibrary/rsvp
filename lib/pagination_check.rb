@@ -8,10 +8,12 @@ class PaginationCheck < Stage
   def run
     @re = /^([0-9]{8})\.(?:tif|jp2)$/
     barcodes = Dir.entries(@dir).sort.delete_if { |e| %w[. ..].include? e }
-    barcodes.each do |barcode|
+    barcodes.each_with_index do |barcode, i|
       path = File.join(@dir, barcode)
+      write_progress(i, barcodes.count, barcode)
       find_errors_in_dir(path) if File.directory? path
     end
+    write_progress(barcodes.count, barcodes.count)
   end
 
   private

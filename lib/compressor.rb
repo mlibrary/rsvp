@@ -34,7 +34,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
       case bps
       when 8
         # It's a contone, so we convert to JP2.
-        write_progress(i, tiff_files.count, "converting #{file} to JPEG 2000")
+        write_progress(i, tiff_files.count,
+                       "#{barcode_file_from_path(file)} JP2")
         begin
           handle_8_bps_conversion(file, metadata)
         rescue CompressorError => e
@@ -42,7 +43,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         end
       when 1
         # It's bitonal, so we G4 compress it.
-        write_progress(i, tiff_files.count, "compressing #{file} with Group4")
+        write_progress(i, tiff_files.count,
+                       "#{barcode_file_from_path(file)} Group4")
         begin
           handle_1_bps_conversion(file, metadata)
         rescue CompressorError => e

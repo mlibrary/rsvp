@@ -35,18 +35,28 @@ class StageTest < Minitest::Test
     end
   end
 
-  def test_barcode_from_file
+  def test_barcode_from_path
     shipment = TestShipment.new(test_name, 'BC')
     stage = Stage.new(shipment.dir, {}, {})
-    barcode_path = File.join(TestShipment::PATH, shipment.barcodes[0], 'test')
-    assert_equal shipment.barcodes[0], stage.barcode_from_file(barcode_path),
-                 'barcode_from_file works'
+    barcode_file = File.join(TestShipment::PATH, shipment.barcodes[0], 'test')
+    assert_equal shipment.barcodes[0], stage.barcode_from_path(barcode_file),
+                 'barcode_from_path works'
+  end
+
+  def test_barcode_file_from_path
+    shipment = TestShipment.new(test_name, 'BC')
+    stage = Stage.new(shipment.dir, {}, {})
+    barcode_file = File.join(TestShipment::PATH, shipment.barcodes[0], 'test')
+    assert_equal File.join(shipment.barcodes[0], 'test'),
+                 stage.barcode_file_from_path(barcode_file),
+                 'barcode_file_from_path works'
   end
 
   def test_cleanup_tempdirs
     shipment = TestShipment.new(test_name, 'BC')
     stage = Stage.new(shipment.dir, {}, {})
     tempdir = stage.create_tempdir
+    assert File.exist?(tempdir), 'tempdir created'
     stage.cleanup
     refute File.exist?(tempdir), 'tempdir deleted by #cleanup'
   end
