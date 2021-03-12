@@ -14,7 +14,7 @@ class Tagger < Stage
     cmd = "find #{@dir} -name '*.tif' -type f | sort"
     files = `#{cmd}`.split("\n")
     files.each_with_index do |file, i|
-      write_progress(i, files.count, file)
+      write_progress(i, files.count, barcode_file_from_path(file))
       tag file
     end
     write_progress(files.count, files.count)
@@ -74,7 +74,7 @@ class Tagger < Stage
   end
 
   def tempdir_for_file(path)
-    barcode = barcode_from_file(path)
+    barcode = barcode_from_path path
     return @barcode_to_tempdir[barcode] if @barcode_to_tempdir.key? barcode
 
     dir = create_tempdir

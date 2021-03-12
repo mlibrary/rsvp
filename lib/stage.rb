@@ -81,8 +81,12 @@ class Stage
     @delete_on_success << path
   end
 
-  def barcode_from_file(path)
+  def barcode_from_path(path)
     path.split(File::SEPARATOR)[-2]
+  end
+
+  def barcode_file_from_path(path)
+    path.split(File::SEPARATOR)[-2..-1].join(File::SEPARATOR)
   end
 
   def log(entry)

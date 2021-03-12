@@ -23,7 +23,7 @@ class Preflight < Stage
     @tiff_regex = /^\d{8}\.tif$/
   end
 
-  def run
+  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     validate_shipment_directory
     @errors << "no barcode directories in #{@dir}" if @metadata[:barcodes].none?
     @metadata[:barcodes].each_with_index do |barcode, i|
@@ -33,6 +33,7 @@ class Preflight < Stage
       write_progress(i, @metadata[:barcodes].count, barcode)
       validate_barcode_directory File.join(@dir, barcode)
     end
+    write_progress(@metadata[:barcodes].count, @metadata[:barcodes].count)
     cleanup
   end
 
