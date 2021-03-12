@@ -39,16 +39,26 @@ class Processor # rubocop:disable Metrics/ClassLength
 
   def config
     return @config unless @config.nil?
+    raise "can't locate config file #{yaml}" unless File.exist? config_file_path
 
-    config_dir = File.expand_path('../config', __dir__)
-    config_dir = @options[:config_dir] if @options.key?(:config_dir)
-    yaml = File.join(config_dir, 'config.yml')
-    raise "can't locate config file #{yaml}" unless File.exist? yaml
-
-    @config = symbolize YAML.load_file yaml
-    local_yaml = File.join(config_dir, 'config.local.yml')
-    @config.merge! symbolize YAML.load_file local_yaml if File.exist? local_yaml
+    @config = symbolize YAML.load_file config_file_path
+    if File.exist? local_config_file_path
+      @config.merge! symbolize(YAML.load_file(local_config_file_path) || {})
+    end
     @config
+  end
+
+  def config_dir
+    @config_dir ||= @options[:config_dir] ||
+                    File.expand_path('../config', __dir__)
+  end
+
+  def config_file_path
+    @config_file_path ||= File.join(config_dir, 'config.yml')
+  end
+
+  def local_config_file_path
+    @local_config_file_path ||= File.join(config_dir, 'config.local.yml')
   end
 
   def stages
