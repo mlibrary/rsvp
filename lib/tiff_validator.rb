@@ -13,8 +13,7 @@ class TIFFValidator < Stage
     cmd = "find #{@dir} -name '*.tif' -type f | sort"
     files = `#{cmd}`.split("\n")
     files.each_with_index do |file, i|
-      write_progress(i, files.count,
-                     file.split(File::SEPARATOR)[-2..-1].join(File::SEPARATOR))
+      write_progress(i, files.count, barcode_file_from_path(file))
       fields = extract_tiff_fields(run_tiffinfo(file))
       err = evaluate(file, fields)
       @errors << err unless err.nil?

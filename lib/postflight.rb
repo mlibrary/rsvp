@@ -54,7 +54,7 @@ class Postflight < Stage
 
   def run_command(cmd)
     stdout_str, _stderr_str, code = Open3.capture3(cmd)
-    @errors << "'#{cmd}' exited with status #{code}" if code.exitstatus != 0
+    @errors << "'#{cmd}' returned #{code.exitstatus}" if code.exitstatus != 0
     return unless stdout_str.chomp.length.positive?
 
     err_lines = stdout_str.chomp.split("\n")
