@@ -37,32 +37,40 @@ class Tagger < Stage
   def tag_artist(path)
     artist = @options[:tagger_artist] || 'dcu'
     if TagData::ARTIST[artist].nil?
-      @errors << "unrecognized artist '#{artist}'"
-      return
+      @warnings << "using custom artist '#{artist}'"
+      tag = artist
+    else
+      tag = TagData::ARTIST[artist]
     end
-
-    run_tiffset(path, 315, TagData::ARTIST[artist])
+    run_tiffset(path, 315, tag)
   end
 
-  def tag_scanner(path)
+  def tag_scanner(path) # rubocop:disable Metrics/MethodLength
     scanner = @options[:tagger_scanner] || return
     if TagData::SCANNER[scanner].nil?
-      @errors << "unrecognized scanner '#{scanner}'"
-      return
-    end
+      unless /\|/.match? scanner
+        @errors << "user-defined scanner must be pipe-delimited 'make|model'"
+        return
+      end
 
-    run_tiffset(path, 271, TagData::SCANNER[scanner][0])
-    run_tiffset(path, 272, TagData::SCANNER[scanner][1])
+      @warnings << "using custom scanner '#{scanner}'"
+      make, model = scanner.split('|')
+    else
+      make, model = TagData::SCANNER[scanner]
+    end
+    run_tiffset(path, 271, make)
+    run_tiffset(path, 272, model)
   end
 
   def tag_software(path)
     software = @options[:tagger_software] || return
     if TagData::SOFTWARE[software].nil?
-      @errors << "unrecognized software '#{software}'"
-      return
+      @warnings << "using custom software '#{software}'"
+      tag = software
+    else
+      tag = TagData::SOFTWARE[software]
     end
-
-    run_tiffset(path, 305, TagData::SOFTWARE[software])
+    run_tiffset(path, 305, tag)
   end
 
   def tempdir_for_file(path)
