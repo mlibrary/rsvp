@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'stage'
+require 'set'
 
 # Image Metadata Validation Stage
 class Postflight < Stage

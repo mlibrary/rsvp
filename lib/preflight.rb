@@ -8,6 +8,8 @@ require 'stage'
 # The only changes this stage makes to the filesystem is deletion
 # of Thumbs.db and .DS_Store
 class Preflight < Stage
+  TIFF_REGEX = /^\d{8}\.tif$/.freeze
+
   def self.removable_files
     %w[.DS_Store Thumbs.db]
   end
@@ -17,13 +19,8 @@ class Preflight < Stage
        checksum.md5 prodnote.tif]
   end
 
-  def initialize(dir, metadata, options)
-    super
-    @metadata[:barcodes] = []
-    @tiff_regex = /^\d{8}\.tif$/
-  end
-
   def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    @metadata[:barcodes] = []
     validate_shipment_directory
     @errors << "no barcode directories in #{@dir}" if @metadata[:barcodes].none?
     @metadata[:barcodes].each_with_index do |barcode, i|
@@ -69,7 +66,7 @@ class Preflight < Stage
       path = File.join(dir, entry)
       if File.directory? path
         @errors << "subdirectory '#{entry}' found in barcode directory #{dir}"
-      elsif @tiff_regex.match? entry
+      elsif self.class::TIFF_REGEX.match? entry
         have_tiff = true
       elsif self.class.ignorable_files.include? entry
         @warnings << "#{path} ignored"
