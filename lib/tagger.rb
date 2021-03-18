@@ -9,7 +9,6 @@ require 'tag_data'
 # is applied to all files that don't have it.
 class Tagger < Stage
   def run
-    @metadata[:tags] = {}
     @barcode_to_tempdir = {}
     cmd = "find #{@dir} -name '*.tif' -type f | sort"
     files = `#{cmd}`.split("\n")
