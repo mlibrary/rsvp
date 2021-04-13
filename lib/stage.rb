@@ -8,12 +8,16 @@ class Stage
   attr_reader :errors, :warnings, :data
   attr_accessor :name
 
-  def initialize(dir, metadata, options = {})
-    raise "nil options passed to #{self.class}#initialize" if options.nil?
+  def initialize(shipment, metadata, options = {}) # rubocop:disable Metrics/MethodLength
+    unless shipment.is_a? Shipment
+      raise StandardError,
+            "shipment class #{shipment.class} for #{self.class}#initialize"
+    end
     raise "nil metadata passed to #{self.class}#initialize" if metadata.nil?
+    raise "nil options passed to #{self.class}#initialize" if options.nil?
 
     @name = self.class.to_s
-    @dir = dir # Shipment directory
+    @shipment = shipment
     @metadata = metadata # Read-write information about the shipment
     @options = options # Hash of command-line arguments
     @errors = [] # Fatal conditions
@@ -61,45 +65,53 @@ class Stage
     return if @tempdirs.nil?
 
     FileUtils.rm_rf @tempdirs.pop while @tempdirs.any?
-    FileUtils.rm_rf tmp_directory if defined? tmp_directory
+    FileUtils.rm_rf @tempdir if defined? @tempdir
   end
 
   def create_tempdir
-    Dir.mkdir tmp_directory unless File.directory? tmp_directory
-    (@tempdirs ||= []) << Dir.mktmpdir(nil, tmp_directory)
+    unless File.directory? @shipment.tmp_directory
+      Dir.mkdir @shipment.tmp_directory
+    end
+    (@tempdirs ||= []) << Dir.mktmpdir(nil, @shipment.tmp_directory)
     @tempdirs[-1]
-  end
-
-  def directory
-    @dir
-  end
-
-  def tmp_directory
-    @tmp_directory ||= File.join @dir, 'tmp'
   end
 
   # source is copied to destination on success,
   # deleted on failure or if noop option flag is set.
   def copy_on_success(source, destination)
-    @copy_on_success ||= []
-    @copy_on_success << [source, destination]
+    (@copy_on_success ||= []) << [source, destination]
   end
 
   def delete_on_success(path)
-    @delete_on_success ||= []
-    @delete_on_success << path
+    (@delete_on_success ||= []) << path
   end
 
   def barcode_from_path(path)
-    path.split(File::SEPARATOR)[-2]
+    @shipment.barcode_from_path(path)
   end
 
   def barcode_file_from_path(path)
-    path.split(File::SEPARATOR)[-2..-1].join(File::SEPARATOR)
+    @shipment.barcode_file_from_path(path)
   end
 
   def log(entry)
     (@data[:log] ||= []) << entry
+  end
+
+  def shipment_directory
+    @shipment.directory
+  end
+
+  def source_directory
+    @shipment.source_directory
+  end
+
+  def barcode_directories
+    @shipment.barcode_directories
+  end
+
+  def image_files(type = 'tif')
+    @shipment.image_files(type)
   end
 
   # Write a single-line progress bar.
