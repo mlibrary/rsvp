@@ -52,11 +52,22 @@ class StageTest < Minitest::Test
                  'barcode_file_from_path works'
   end
 
+  def test_tempdir
+    shipment = TestShipment.new(test_name, 'BC')
+    stage = Stage.new(shipment.dir, {}, {})
+    tempdir = stage.create_tempdir
+    assert File.directory?(tempdir), 'tempdir created'
+    assert_equal 'tmp', tempdir.split(File::SEPARATOR)[-2],
+                 'temp directory is named "tmp"'
+    assert_equal stage.directory,
+                 tempdir.split(File::SEPARATOR)[0..-3].join(File::SEPARATOR),
+                 'temp directory is at top level of shipment directory'
+  end
+
   def test_cleanup_tempdirs
     shipment = TestShipment.new(test_name, 'BC')
     stage = Stage.new(shipment.dir, {}, {})
     tempdir = stage.create_tempdir
-    assert File.exist?(tempdir), 'tempdir created'
     stage.cleanup
     refute File.exist?(tempdir), 'tempdir deleted by #cleanup'
   end
@@ -69,5 +80,14 @@ class StageTest < Minitest::Test
     stage.delete_on_success temp
     stage.cleanup
     refute File.exist?(temp), 'file deleted by #delete_on_success'
+  end
+
+  def test_log
+    shipment = TestShipment.new(test_name, 'BC')
+    stage = Stage.new(shipment.dir, {}, {})
+    stage.log('testlog')
+    refute_nil stage.data[:log], 'stage#data[:log] is not nil'
+    assert_equal 1, stage.data[:log].size, 'one log entry'
+    assert_equal 'testlog', stage.data[:log][0], 'log entry is "testlog"'
   end
 end
