@@ -61,12 +61,21 @@ class Stage
     return if @tempdirs.nil?
 
     FileUtils.rm_rf @tempdirs.pop while @tempdirs.any?
+    FileUtils.rm_rf tmp_directory if defined? tmp_directory
   end
 
   def create_tempdir
-    @tempdirs ||= []
-    @tempdirs << Dir.mktmpdir
+    Dir.mkdir tmp_directory unless File.directory? tmp_directory
+    (@tempdirs ||= []) << Dir.mktmpdir(nil, tmp_directory)
     @tempdirs[-1]
+  end
+
+  def directory
+    @dir
+  end
+
+  def tmp_directory
+    @tmp_directory ||= File.join @dir, 'tmp'
   end
 
   # source is copied to destination on success,
@@ -90,8 +99,7 @@ class Stage
   end
 
   def log(entry)
-    @data[:log] ||= []
-    @data[:log] << entry
+    (@data[:log] ||= []) << entry
   end
 
   # Write a single-line progress bar.
