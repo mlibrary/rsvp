@@ -1,9 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'digest'
 require 'json'
 require 'pathname'
 require 'yaml'
+require 'shipment'
 require 'string_color'
 
 # Processor
@@ -11,20 +13,21 @@ class Processor # rubocop:disable Metrics/ClassLength
   attr_reader :dir, :options, :status
 
   def initialize(dir, options = {})
-    @dir = dir
+    @shipment = Shipment.new(dir)
     @options = options
     @options[:config] = config
     @status = { stages: {}, metadata: {} }
     init_status_file
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     # Bail out with a message if any previous stage had an error.
     discard_failure if @options[:reset]
     if had_previous_error?
       puts 'Stage failed on previous run, aborting'.red
       return
     end
+    @shipment.restore_from_source_directory if @options[:restart_all]
     stages.each do |stage|
       next unless @status[:stages][stage.name.to_sym].nil? ||
                   @status[:stages][stage.name.to_sym][:end].nil?
@@ -68,7 +71,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     config[:stages].each do |s|
       require s[:file]
       stage_class = Object.const_get(s[:class])
-      stage = stage_class.new(@dir, @status[:metadata], @options)
+      stage = stage_class.new(@shipment, @status[:metadata], @options)
       stage.name = s[:name]
       @stages << stage
     end
@@ -76,7 +79,9 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def query # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    puts "===== SHIPMENT #{@dir} STATUS =====".blue
+    puts "===== SHIPMENT #{@shipment.directory} STATUS =====".blue
+    md_status = query_metadata
+    puts md_status.brown
     stages.each do |stage|
       stage_status = @status[:stages][stage.name.to_sym]
       if stage_status.nil? || stage_status[:end].nil?
@@ -90,8 +95,33 @@ class Processor # rubocop:disable Metrics/ClassLength
     end
   end
 
+  def query_metadata # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    unless File.directory? @shipment.source_directory
+      return 'source directory not yet populated'
+    end
+
+    added = []
+    removed = []
+    changed = []
+    @shipment.source_image_files.each do |path|
+      if @status[:metadata][:checksums][path.to_sym].nil?
+        added << path
+      else
+        sha256 = Digest::SHA256.file path
+        if @status[:metadata][:checksums][path.to_sym] != sha256.hexdigest
+          changed << path
+        end
+      end
+    end
+    @status[:metadata][:checksums].each_key do |path|
+      removed << path unless File.exist? path.to_s
+    end
+    "source directory changes: #{added.count} added," \
+    " #{removed.count} removed, #{changed.count} changed"
+  end
+
   def status_file
-    @status_file ||= File.join(@dir, 'status.json')
+    @status_file ||= File.join(@shipment.directory, 'status.json')
   end
 
   def write_status

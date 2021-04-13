@@ -25,10 +25,14 @@ module Fixtures
   TEST_FIXTURES_PATH = File.join(__dir__, 'fixtures').freeze
 
   def self.tiff_fixture(name)
+    return unless TIFF_FIXTURES[name.to_sym]
+
     File.join(TEST_FIXTURES_PATH, TIFF_FIXTURES[name.to_sym][:file])
   end
 
   def self.jp2_fixture(name)
+    return unless JP2_FIXTURES[name.to_sym]
+
     File.join(TEST_FIXTURES_PATH, JP2_FIXTURES[name.to_sym][:file])
   end
 end

@@ -3,10 +3,9 @@
 
 require 'luhn'
 require 'fixtures'
+require_relative '../lib/shipment'
 
-class TestShipment
-  attr_reader :barcodes
-
+class TestShipment < Shipment
   PATH = File.join(__dir__, 'shipments').freeze
   @test_shipments = []
 
@@ -40,21 +39,21 @@ class TestShipment
   # [TIF name, dest] copy TIF fixture to dest (which can be a range)
   # [F dest] create zero-length file at dest
   # [DIR] cwd to shipment directory
-  def initialize(name, spec)
+  def initialize(name, spec = '')
     self.class.add_test_shipment(name)
-    @barcodes = []
     @name = name
+    dir = File.join(PATH, @name)
     FileUtils.rm_r(dir, force: true) if File.directory? dir
     Dir.mkdir(dir)
+    super dir
     process_spec spec
   end
 
   def process_spec(spec) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
-    @current_dir = dir
+    @current_dir = @dir
     elements = spec.split(/\s+/)
     while elements.any?
-      op = elements.shift
-      case op
+      case op = elements.shift
       when 'BC'
         handle_barcode_op
       when 'BBC'
@@ -66,32 +65,28 @@ class TestShipment
       when 'F'
         FileUtils.touch(File.join(@current_dir, elements.shift))
       when 'DIR'
-        @current_dir = dir
+        @current_dir = @dir
       else
-        raise "Unrecognized opcode #{op}"
+        raise StandardError, "Unrecognized opcode #{op}"
       end
     end
-  end
-
-  def dir
-    @dir ||= File.join(PATH, @name)
   end
 
   private
 
   def handle_barcode_op
-    @barcodes << self.class.generate_barcode(true)
-    @current_dir = File.join(dir, @barcodes[-1])
+    barcode = self.class.generate_barcode(true)
+    @current_dir = File.join(@dir, barcode)
     Dir.mkdir(@current_dir)
   end
 
   def handle_bogus_barcode_op
-    @barcodes << self.class.generate_barcode(false)
-    @current_dir = File.join(dir, @barcodes[-1])
+    barcode = self.class.generate_barcode(false)
+    @current_dir = File.join(@dir, barcode)
     Dir.mkdir(@current_dir)
   end
 
-  def handle_tiff_op(name, dest) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_tiff_op(name, dest) # rubocop:disable Metrics/MethodLength
     fixture = Fixtures.tiff_fixture(name)
     case dest
     when /^\d+$/
@@ -99,18 +94,17 @@ class TestShipment
       FileUtils.cp fixture, File.join(@current_dir, dest)
     when /^\d+-\d+$/
       first, last = dest.split('-').map(&:to_i)
-      raise "Ill-formed TIFF file range #{match[1]}-#{match[2]}" if first > last
-
+      first, last = last, first if first > last
       (first..last).each do |n|
         dest = format '%<filename>08d.tif', { filename: n }
         FileUtils.cp fixture, File.join(@current_dir, dest)
       end
     else
-      raise "Unknown TIFF destination format '#{dest}'"
+      raise StandardError, "Unknown TIFF destination format '#{dest}'"
     end
   end
 
-  def handle_jp2_op(name, dest) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_jp2_op(name, dest) # rubocop:disable Metrics/MethodLength
     fixture = Fixtures.jp2_fixture(name)
     case dest
     when /^\d+$/
@@ -118,14 +112,13 @@ class TestShipment
       FileUtils.cp fixture, File.join(@current_dir, dest)
     when /^\d+-\d+$/
       first, last = dest.split('-').map(&:to_i)
-      raise "Ill-formed JP2 file range #{match[1]}-#{match[2]}" if first > last
-
+      first, last = last, first if first > last
       (first..last).each do |n|
         dest = format '%<filename>08d.jp2', { filename: n }
         FileUtils.cp fixture, File.join(@current_dir, dest)
       end
     else
-      raise "Unknown JP2 destination format '#{dest}'"
+      raise StandardError, "Unknown JP2 destination format '#{dest}'"
     end
   end
 end

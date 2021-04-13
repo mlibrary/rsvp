@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'digest'
 require 'luhn'
 require 'stage'
 
@@ -21,29 +22,43 @@ class Preflight < Stage
 
   def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     @metadata[:barcodes] = []
+    @shipment.setup_source_directory
+    checksum_source_directory
     validate_shipment_directory
-    @errors << "no barcode directories in #{@dir}" if @metadata[:barcodes].none?
+    if @metadata[:barcodes].none?
+      @errors << "no barcode directories in #{shipment_directory}"
+    end
     @metadata[:barcodes].each_with_index do |barcode, i|
       unless Luhn.valid? barcode
         @warnings << "Luhn checksum failed for barcode #{barcode}"
       end
       write_progress(i, @metadata[:barcodes].count, barcode)
-      validate_barcode_directory File.join(@dir, barcode)
+      validate_barcode_directory File.join(shipment_directory, barcode)
     end
     write_progress(@metadata[:barcodes].count, @metadata[:barcodes].count)
     cleanup
   end
 
+  # Add SHA256 entries to @metadata for each source/barcode/file.
+  def checksum_source_directory
+    @shipment.source_image_files.each do |path|
+      sha256 = Digest::SHA256.file path
+      (@metadata[:checksums] ||= {})[path] = sha256.hexdigest
+    end
+  end
+
   private
 
-  # A shipment directory is valid if it contains only barcode directories
-  # and status.json
-  def validate_shipment_directory # rubocop:disable Metrics/MethodLength
-    Dir.entries(@dir).sort.each do |entry|
+  # A shipment directory is valid if it contains only barcode directories,
+  # a source directory, and status.json
+  def validate_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    Dir.entries(shipment_directory).sort.each do |entry|
       next if %w[. ..].include? entry
       next if entry == 'status.json'
 
-      path = File.join(@dir, entry)
+      path = File.join(shipment_directory, entry)
+      next if entry == 'source' && File.directory?(path)
+
       if File.directory? path
         @metadata[:barcodes] << entry
       elsif self.class.removable_files.include? entry

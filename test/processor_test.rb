@@ -10,53 +10,53 @@ class ProcessorTest < Minitest::Test
   end
 
   def test_new # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    shipment = TestShipment.new(test_name, '')
-    processor = Processor.new(shipment.dir, {})
+    shipment = TestShipment.new(test_name)
+    processor = Processor.new(shipment.directory, {})
     refute_nil processor, 'processor successfully created'
     refute_nil processor.status, 'processor status exists'
-    refute File.exist?(File.join(shipment.dir, 'status.json')),
+    refute File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json not created yet'
     processor.write_status
-    assert File.exist?(File.join(shipment.dir, 'status.json')),
+    assert File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json created'
     metadata = processor.status[:metadata]
     assert metadata, 'processor metadata initialized'
   end
 
   def test_config
-    shipment = TestShipment.new(test_name, '')
+    shipment = TestShipment.new(test_name)
     options = { config_dir: File.join(TEST_ROOT, 'config') }
-    processor = Processor.new(shipment.dir, options)
+    processor = Processor.new(shipment.directory, options)
     refute_nil processor, 'processor successfully created'
     assert_match(/fake_feed_validate/, processor.config[:feed_validate_script],
                  'has custom feed validate path')
   end
 
   def test_unlink_status_on_reset
-    shipment = TestShipment.new(test_name, '')
-    status_json = File.join(shipment.dir, 'status.json')
+    shipment = TestShipment.new(test_name)
+    status_json = File.join(shipment.directory, 'status.json')
     FileUtils.touch(status_json)
     options = { restart_all: 1 }
-    Processor.new(shipment.dir, options)
+    Processor.new(shipment.directory, options)
     refute File.exist?(status_json), 'status.json deleted on reset'
   end
 
   def test_stages
-    shipment = TestShipment.new(test_name, '')
-    processor = Processor.new(shipment.dir)
+    shipment = TestShipment.new(test_name)
+    processor = Processor.new(shipment.directory)
     assert_kind_of Array, processor.stages, 'processor#stages is Array'
   end
 
   def test_query
-    shipment = TestShipment.new(test_name, '')
-    processor = Processor.new(shipment.dir)
+    shipment = TestShipment.new(test_name)
+    processor = Processor.new(shipment.directory)
     assert_output(/not.yet.run/i) { processor.query }
   end
 
   def test_run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC F .DS_Store')
     options = { no_progress: true }
-    processor = Processor.new(shipment.dir, options)
+    processor = Processor.new(shipment.directory, options)
     capture_io do
       processor.run
     end
@@ -74,16 +74,16 @@ class ProcessorTest < Minitest::Test
 
   def test_invalid_status_file
     shipment = TestShipment.new(test_name, 'BC F .DS_Store')
-    status_json = File.join(shipment.dir, 'status.json')
+    status_json = File.join(shipment.directory, 'status.json')
     FileUtils.touch(status_json)
-    assert_raises(JSON::ParserError) { Processor.new(shipment.dir, {}) }
+    assert_raises(JSON::ParserError) { Processor.new(shipment.directory, {}) }
     assert_equal(File.size(status_json), 0, 'status.json is unmodified')
   end
 
   def test_discard_failure
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.dir, {})
+    processor = Processor.new(shipment.directory, {})
     capture_io do
       processor.run
     end
@@ -95,7 +95,7 @@ class ProcessorTest < Minitest::Test
 
   def test_report_stage_error_long
     shipment = TestShipment.new(test_name, 'BC T bad_16bps 1-20')
-    processor = Processor.new(shipment.dir, {})
+    processor = Processor.new(shipment.directory, {})
     out, _err = capture_io do
       processor.run
     end

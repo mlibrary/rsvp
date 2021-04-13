@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'stage'
+require 'digest'
 require 'set'
+require 'stage'
 
 # Image Metadata Validation Stage
 class Postflight < Stage
@@ -12,23 +13,24 @@ class Postflight < Stage
 
   private
 
-  # Can we record successful conversions in @data and
-  # then only redo the ones that failed?
-  # process-tifs.sh seems to expect to run on shipment directory
   def process_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    barcodes = Dir.entries(@dir).sort.delete_if { |e| %w[. ..].include? e }
     real_barcodes = []
-    barcodes.each_with_index do |barcode, i|
-      path = File.join(@dir, barcode)
-      write_progress(i, barcodes.count + 1, "feed validate #{barcode}")
+    barcode_directories.each_with_index do |path, i|
+      barcode = path.split(File::SEPARATOR)[-1]
+      write_progress(i, barcode_directories.count + 2,
+                     "feed validate #{barcode}")
       if File.directory? path
         process_barcode_directory(path, barcode)
         real_barcodes << barcode
       end
     end
-    write_progress(barcodes.count, barcodes.count + 1, 'barcode check')
+    write_progress(barcode_directories.count, barcode_directories.count + 2,
+                   'barcode check')
     check_barcode_lists(real_barcodes)
-    write_progress(barcodes.count + 1, barcodes.count + 1)
+    write_progress(barcode_directories.count + 1, barcode_directories.count + 2,
+                   'verify checksums')
+    verify_source_checksums
+    write_progress(barcode_directories.count + 2, barcode_directories.count + 2)
   end
 
   def process_barcode_directory(dir, barcode)
@@ -36,14 +38,6 @@ class Postflight < Stage
     cmd = "perl #{script} google mdp #{dir} #{barcode}"
     log "running '#{cmd}'"
     run_command(cmd)
-    Dir.entries(dir).each do |entry|
-      next if %w[. ..].include? entry
-
-      path = File.join(dir, entry)
-      unless File.directory? path
-        # run_md5(dir, entry)
-      end
-    end
   end
 
   def check_barcode_lists(barcodes)
@@ -51,6 +45,26 @@ class Postflight < Stage
     s2 = Set.new barcodes
     @errors << "barcodes removed during run: #{s1 - s2}" if (s1 - s2).any?
     @errors << "barcodes added during run: #{s2 - s1}" if (s2 - s1).any?
+  end
+
+  def verify_source_checksums # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    @shipment.source_image_files.each do |path|
+      if @metadata[:checksums][path].nil?
+        @errors << "file added: no checksum for #{path}"
+      else
+        sha256 = Digest::SHA256.file path
+        if @metadata[:checksums][path] != sha256.hexdigest
+          @errors << "checksum mismatch: #{path} changed" \
+                     " from #{@metadata[:checksums][path]}" \
+                     " to #{sha256.hexdigest}"
+        end
+      end
+    end
+    @metadata[:checksums].each_key do |path|
+      unless File.exist? path
+        @errors << "file missing: #{path} not found in source directory"
+      end
+    end
   end
 
   def run_command(cmd)
@@ -66,12 +80,4 @@ class Postflight < Stage
       @errors << line
     end
   end
-
-  #   def run_md5(dir, entry)
-  #     path = File.join(dir, entry)
-  #     cmd = (/darwin/.match? RUBY_PLATFORM ? 'md5 -r ' : 'md5sum ') + path
-  #     output = _run_command(cmd)
-  #     @md5_data[dir] = +'' if @md5_data[dir].nil? # thawed String
-  #     @md5_data[dir] << output
-  #   end
 end

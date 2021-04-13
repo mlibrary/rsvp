@@ -10,13 +10,11 @@ require 'tag_data'
 class Tagger < Stage
   def run
     @barcode_to_tempdir = {}
-    cmd = "find #{@dir} -name '*.tif' -type f | sort"
-    files = `#{cmd}`.split("\n")
-    files.each_with_index do |file, i|
-      write_progress(i, files.count, barcode_file_from_path(file))
+    image_files.each_with_index do |file, i|
+      write_progress(i, image_files.count, barcode_file_from_path(file))
       tag file
     end
-    write_progress(files.count, files.count)
+    write_progress(image_files.count, image_files.count)
     cleanup
   end
 

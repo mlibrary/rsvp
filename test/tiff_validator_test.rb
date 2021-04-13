@@ -14,15 +14,15 @@ class TIFFValidatorTest < Minitest::Test
   end
 
   def test_new
-    shipment = TestShipment.new(test_name, '')
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    shipment = TestShipment.new(test_name)
+    stage = TIFFValidator.new(shipment, {}, @options)
     refute_nil stage, 'stage successfully created'
   end
 
   def test_run_without_errors
     spec = 'BC T bitonal 1 T contone 2'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    stage = TIFFValidator.new(shipment, {}, @options)
     stage.run
     assert_equal(0, stage.errors.count, 'stage runs without errors')
   end
@@ -30,7 +30,7 @@ class TIFFValidatorTest < Minitest::Test
   def test_16bps_fails
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
+    stage = TIFFValidator.new(shipment, {}, @options)
     stage.run
     assert_equal(1, stage.errors.count, '16bps TIFF rejected')
   end
@@ -38,8 +38,8 @@ class TIFFValidatorTest < Minitest::Test
   def test_pixelspercentimeter_fails
     spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
-    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    stage = TIFFValidator.new(shipment, {}, @options)
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `convert #{tiff} -units PixelsPerCentimeter #{tiff}`
     stage.run
     assert(stage.errors.any?(%r{pixels/cm}),
@@ -49,8 +49,8 @@ class TIFFValidatorTest < Minitest::Test
   def test_bitonal_3spp_fails
     spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
-    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    stage = TIFFValidator.new(shipment, {}, @options)
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `tiffset -s 277 '3' #{tiff}`
     stage.run
     assert(stage.errors.any?(/SPP\s3\swith\s1\sBPS/i),
@@ -60,8 +60,8 @@ class TIFFValidatorTest < Minitest::Test
   def test_bitonal_resolution_fails
     spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
-    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    stage = TIFFValidator.new(shipment, {}, @options)
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
     stage.run
     assert(stage.errors.any?(/100x100\sbitonal/),
@@ -71,8 +71,8 @@ class TIFFValidatorTest < Minitest::Test
   def test_contone_2spp_fails
     spec = 'BC T contone 1'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
-    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    stage = TIFFValidator.new(shipment, {}, @options)
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `tiffset -s 277 '2' #{tiff}`
     stage.run
     assert(stage.errors.any?(/SPP\s2\swith\s8\sBPS/i),
@@ -82,8 +82,8 @@ class TIFFValidatorTest < Minitest::Test
   def test_contone_resolution_fails
     spec = 'BC T contone 1'
     shipment = TestShipment.new(test_name, spec)
-    stage = TIFFValidator.new(shipment.dir, {}, @options)
-    tiff = File.join(shipment.dir, shipment.barcodes[0], '00000001.tif')
+    stage = TIFFValidator.new(shipment, {}, @options)
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
     stage.run
     assert(stage.errors.any?(/100x100\scontone/),
