@@ -103,10 +103,11 @@ class Shipment
 
     Dir.mkdir File.join(@dir, 'source')
     barcode_directories.each do |dir|
-      if File.directory? dir
-        dest = File.join(source_directory, dir.split(File::SEPARATOR)[-1])
-        FileUtils.copy_entry(dir, dest)
-      end
+      next unless File.directory? dir
+
+      barcode = dir.split(File::SEPARATOR)[-1]
+      yield barcode if block_given?
+      FileUtils.copy_entry(dir, File.join(source_directory, barcode))
     end
   end
 

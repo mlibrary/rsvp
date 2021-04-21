@@ -130,9 +130,9 @@ class Stage # rubocop:disable Metrics/ClassLength
     shipment.directory
   end
 
-  # def source_directory
-  #  shipment.source_directory
-  # end
+  def source_directory
+    shipment.source_directory
+  end
 
   def barcode_directories
     shipment.barcode_directories

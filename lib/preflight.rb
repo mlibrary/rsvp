@@ -22,28 +22,44 @@ class Preflight < Stage
 
   def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     @metadata[:barcodes] = []
-    shipment.setup_source_directory
-    checksum_source_directory
     validate_shipment_directory
     if @metadata[:barcodes].none?
       add_error Error.new("no barcode directories in #{shipment_directory}")
+      return
+    end
+    step = 0
+    steps = 2 * @metadata[:barcodes].count
+    steps += @metadata[:barcodes].count unless File.directory? source_directory
+    shipment.setup_source_directory do |barcode|
+      write_progress(step, steps, "setup source/#{barcode}")
+      step += 1
+    end
+    checksum_source_directory do |barcode|
+      write_progress(step, steps, "checksum source/#{barcode}")
+      step += 1
     end
     @metadata[:barcodes].each_with_index do |barcode, i|
       unless Luhn.valid? barcode
         add_warning Error.new('Luhn checksum failed', barcode)
       end
-      write_progress(i, @metadata[:barcodes].count, barcode)
+      write_progress(step + i, steps, "validate #{barcode}")
       validate_barcode_directory barcode
     end
-    write_progress(@metadata[:barcodes].count, @metadata[:barcodes].count)
+    write_progress(steps, steps)
     cleanup
   end
 
   # Add SHA256 entries to @metadata for each source/barcode/file.
-  def checksum_source_directory
+  def checksum_source_directory # rubocop:disable Metrics/AbcSize
+    last_barcode = nil
     shipment.source_image_files.each do |image_file|
+      if block_given? && (last_barcode.nil? ||
+                          last_barcode != image_file.barcode)
+        yield image_file.barcode
+      end
       sha256 = Digest::SHA256.file image_file.path
       (@metadata[:checksums] ||= {})[image_file.path.to_sym] = sha256.hexdigest
+      last_barcode = image_file.barcode
     end
   end
 
