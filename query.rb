@@ -97,7 +97,7 @@ begin
           next if args.count.positive? && !args.include?(barcode)
 
           puts (barcode.nil? ? '(General)' : barcode).bold
-          processor.error_query[barcode].each do |h|
+          processor.warning_query[barcode].each do |h|
             puts h[:stage].brown
             h[:warnings].each do |warn|
               puts "  #{'File'.bold}\t#{warn.path}" unless warn.path.nil?
