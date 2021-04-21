@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+ImageFile = Struct.new(:barcode, :path, :barcode_file)
+
 # Shipment directory class
 class Shipment
   attr_reader :metadata
@@ -29,8 +31,10 @@ class Shipment
 
   def barcodes
     @barcodes ||= begin
-      bars = Dir.entries(@dir).reject { |b| %w[. .. source tmp].include? b }
-      bars.select { |b| File.directory?(File.join(@dir, b)) }
+      bars = Dir.entries(@dir).reject do |b|
+        %w[. .. source tmp].include? b
+      end
+      bars.select { |b| File.directory?(File.join(@dir, b)) }.sort
     end
   end
 
@@ -43,12 +47,14 @@ class Shipment
   def source_barcodes
     @source_barcodes ||= begin
       bars = Dir.entries(source_directory).reject do |b|
-        %w[. .. source tmp].include? b
+        %w[. .. .DS_Store source tmp].include? b
       end
       bars.select { |b| File.directory?(File.join(@dir, b)) }
+      bars.sort
     end
   end
 
+  # FIXME: these may not be used any more
   def barcode_from_path(path)
     path.split(File::SEPARATOR)[-2]
   end
@@ -57,15 +63,34 @@ class Shipment
     path.split(File::SEPARATOR)[-2..-1].join(File::SEPARATOR)
   end
 
+  # Think twice about trying to memoize this.
+  # Compression will change the names of image files if not the quantity.
   def image_files(type = 'tif')
-    cmd = "find #{@dir} -name '*.#{type}' -type f -print" \
-          " -o \\( -path #{source_directory} -prune \\) | sort"
-    `#{cmd}`.split("\n")
+    files = []
+    barcodes.each do |b|
+      barcode_dir = File.join(@dir, b)
+      entries = Dir.entries(barcode_dir).reject { |e| %w[. ..].include? e }
+      entries.each do |e|
+        next unless e.end_with? type
+
+        files << ImageFile.new(b, File.join(barcode_dir, e), File.join(b, e))
+      end
+    end
+    files
   end
 
   def source_image_files(type = 'tif')
-    cmd = "find #{source_directory} -name '*.#{type}' -type f -print | sort"
-    `#{cmd}`.split("\n")
+    files = []
+    source_barcodes.each do |b|
+      barcode_dir = File.join(@dir, 'source', b)
+      entries = Dir.entries(barcode_dir).reject { |e| %w[. ..].include? e }
+      entries.each do |e|
+        next unless e.end_with? type
+
+        files << ImageFile.new(b, File.join(barcode_dir, e), File.join(b, e))
+      end
+    end
+    files
   end
 
   # This is the very first step of the whole workflow.

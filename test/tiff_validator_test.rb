@@ -42,7 +42,7 @@ class TIFFValidatorTest < Minitest::Test
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `convert #{tiff} -units PixelsPerCentimeter #{tiff}`
     stage.run
-    assert(stage.errors.any?(%r{pixels/cm}),
+    assert(stage.errors.any? { |e| %r{pixels/cm}.match? e.to_s },
            'PixelsPerCentimeter TIFF rejected')
   end
 
@@ -53,7 +53,7 @@ class TIFFValidatorTest < Minitest::Test
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `tiffset -s 277 '3' #{tiff}`
     stage.run
-    assert(stage.errors.any?(/SPP\s3\swith\s1\sBPS/i),
+    assert(stage.errors.any? { |e| /SPP\s3\swith\s1\sBPS/i.match? e.to_s },
            '1 BPS 3 SPP TIFF rejected')
   end
 
@@ -64,7 +64,7 @@ class TIFFValidatorTest < Minitest::Test
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
     stage.run
-    assert(stage.errors.any?(/100x100\sbitonal/),
+    assert(stage.errors.any? { |e| /100x100\sbitonal/i.match? e.to_s },
            '100x100 bitonal TIFF rejected')
   end
 
@@ -75,7 +75,7 @@ class TIFFValidatorTest < Minitest::Test
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `tiffset -s 277 '2' #{tiff}`
     stage.run
-    assert(stage.errors.any?(/SPP\s2\swith\s8\sBPS/i),
+    assert(stage.errors.any? { |e| /SPP\s2\swith\s8\sBPS/i.match? e.to_s },
            '8 BPS 2 SPP TIFF rejected')
   end
 
@@ -86,7 +86,7 @@ class TIFFValidatorTest < Minitest::Test
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
     stage.run
-    assert(stage.errors.any?(/100x100\scontone/),
+    assert(stage.errors.any? { |e| /100x100\scontone/i.match? e.to_s },
            '100x100 contone TIFF rejected')
   end
 end

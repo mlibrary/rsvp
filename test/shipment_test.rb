@@ -4,7 +4,7 @@
 require 'minitest/autorun'
 require 'shipment'
 
-class ShipmentTest < Minitest::Test
+class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def teardown
     TestShipment.remove_test_shipments
   end
@@ -64,6 +64,17 @@ class ShipmentTest < Minitest::Test
     assert_equal File.join(test_shipment.barcodes[0], 'test'),
                  shipment.barcode_file_from_path(barcode_file),
                  'barcode_file_from_path works'
+  end
+
+  def test_image_files
+    spec = 'BC T contone 1 T contone 2 BC T contone 1 BC'
+    test_shipment = TestShipment.new(test_name, spec)
+    shipment = Shipment.new(test_shipment.directory)
+    files = shipment.image_files
+    assert_equal 3, files.count, '3 image files'
+    assert_kind_of ImageFile, files[0], 'produces ImageFile'
+    refute_nil files[0].barcode, 'ImageFile barcode is not nil'
+    refute_nil files[0].path, 'ImageFile path is not nil'
   end
 
   def test_setup_source_directory # rubocop:disable Metrics/AbcSize

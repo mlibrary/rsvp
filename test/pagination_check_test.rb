@@ -32,7 +32,8 @@ class PaginationCheckTest < Minitest::Test
     stage = PaginationCheck.new(shipment, {}, @options)
     stage.run
     assert(stage.errors.count == 1, 'one missing page error')
-    assert_match(/missing/, stage.errors[0], 'error contains "missing"')
+    assert_match(/missing/, stage.errors[0].description,
+                 'error contains "missing"')
   end
 
   def test_missing_range
@@ -40,7 +41,7 @@ class PaginationCheckTest < Minitest::Test
     stage = PaginationCheck.new(shipment, {}, @options)
     stage.run
     assert(stage.errors.count == 1, 'one missing page range error')
-    assert_match(/2-4/, stage.errors[0], 'error contains range')
+    assert_match(/2-4/, stage.errors[0].description, 'error contains range')
   end
 
   def test_duplicate
@@ -48,6 +49,7 @@ class PaginationCheckTest < Minitest::Test
     stage = PaginationCheck.new(shipment, {}, @options)
     stage.run
     assert(stage.errors.count == 1, 'one error from duplicate page')
-    assert_match(/duplicate/, stage.errors[0], 'error contains "duplicate"')
+    assert_match(/duplicate/, stage.errors[0].description,
+                 'error contains "duplicate"')
   end
 end

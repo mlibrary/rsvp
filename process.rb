@@ -14,8 +14,6 @@ require 'processor'
 
 options_data = [['-c', '--config-dir', :config_dir,
                  'Directory for configuration files'],
-                ['-e', '--stop-on-error', :stop_on_error,
-                 'Stop long-running stages after the first error'],
                 ['-n', '--noop', :noop,
                  'No-op, make no changes to the filesystem'],
                 ['-r', '--reset', :reset,

@@ -85,8 +85,8 @@ class TaggerCustomTagTest < Minitest::Test
     stage = Tagger.new(shipment, {}, options)
     stage.run
     assert(stage.errors.count.zero?, 'no errors generated')
-    assert(stage.warnings.any?(/custom\sartist/i),
-           'warns about custom software string')
+    assert stage.warnings.any? { |e| /custom\sartist/i.match? e.to_s },
+           'warns about custom artist string'
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     info = `tiffinfo #{tiff}`
     assert_match("Artist: #{artist}", info, 'tiffinfo has custom artist tag')
@@ -98,8 +98,8 @@ class TaggerCustomTagTest < Minitest::Test
     stage = Tagger.new(shipment, {}, options)
     stage.run
     assert(stage.errors.count.zero?, 'no errors generated')
-    assert(stage.warnings.any?(/custom\sscanner/i),
-           'warns about custom software string')
+    assert stage.warnings.any? { |e| /custom\sscanner/i.match? e.to_s },
+           'warns about custom scanner string'
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     info = `tiffinfo #{tiff}`
     assert_match('Make: Scans-R-Us', info,
@@ -113,7 +113,7 @@ class TaggerCustomTagTest < Minitest::Test
     options = { no_progress: true, tagger_scanner: 'some random string' }
     stage = Tagger.new(shipment, {}, options)
     stage.run
-    assert(stage.errors.any?(/pipe-delimited/),
+    assert(stage.errors.any? { |e| /make\|model/i.match? e.to_s },
            'generates pipe-delimited error')
   end
 
@@ -124,8 +124,8 @@ class TaggerCustomTagTest < Minitest::Test
     stage = Tagger.new(shipment, {}, options)
     stage.run
     assert(stage.errors.count.zero?, 'no errors generated')
-    assert(stage.warnings.any?(/custom\ssoftware/i),
-           'warns about custom software string')
+    assert stage.warnings.any? { |e| /custom\ssoftware/i.match? e.to_s },
+           'warns about custom software string'
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     info = `tiffinfo #{tiff}`
     assert_match("Software: #{software}", info,

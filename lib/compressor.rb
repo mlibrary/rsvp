@@ -23,9 +23,9 @@ end
 
 # TIFF to JP2/TIFF compression stage
 class Compressor < Stage # rubocop:disable Metrics/ClassLength
-  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
-    image_files.each_with_index do |file, i|
-      metadata = tiffinfo(file)
+  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    image_files.each_with_index do |image_file, i|
+      metadata = tiffinfo(image_file)
       next if metadata.nil?
 
       # Figure out what sort of image this is.
@@ -34,26 +34,24 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
       case bps
       when 8
         # It's a contone, so we convert to JP2.
-        write_progress(i, image_files.count,
-                       "#{barcode_file_from_path(file)} JP2")
+        write_progress(i, image_files.count, "#{image_file.barcode_file} JP2")
         begin
-          handle_8_bps_conversion(file, metadata)
+          handle_8_bps_conversion(image_file.path, metadata)
         rescue CompressorError => e
-          @errors << e.message
+          add_error Error.new(e.message, image_file.barcode, image_file.path)
         end
       when 1
         # It's bitonal, so we G4 compress it.
-        write_progress(i, image_files.count,
-                       "#{barcode_file_from_path(file)} Group4")
+        write_progress(i, image_files.count, "#{image_file.barcode_file} G4")
         begin
-          handle_1_bps_conversion(file, metadata)
+          handle_1_bps_conversion(image_file.path, metadata)
         rescue CompressorError => e
-          @errors << e.message
+          add_error Error.new(e.message, image_file.barcode, image_file.path)
         end
       else
-        @errors << "invalid source TIFF BPS #{bps}: #{file}"
+        add_error Error.new("invalid source TIFF BPS #{bps}",
+                            image_file.barcode, image_file.path)
       end
-      break if @options[:stop_on_error] && @errors.count.positive?
     end
     write_progress(image_files.count, image_files.count)
     cleanup
@@ -61,18 +59,19 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
 
   private
 
-  def tiffinfo(path) # rubocop:disable Metrics/MethodLength
-    cmd = "tiffinfo #{path}"
+  def tiffinfo(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    cmd = "tiffinfo #{image_file.path}"
     stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
-      @errors << "Command '#{cmd}' exited with status #{code.exitstatus}"
+      add_error Error.new("'#{cmd}' exit status #{code.exitstatus}",
+                          image_file.barcode, image_file.path)
       return nil
     end
     stderr_str.chomp.split("\n").each do |err|
       if /tag\signored/.match? err
-        @warnings << "#{path}: #{err}"
+        add_warning Error.new(err, image_file.barcode, image_file.path)
       else
-        @errors << "#{path}: #{err}"
+        add_error Error.new(err, image_file.barcode, image_file.path)
         return nil
       end
     end
@@ -163,7 +162,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
       log cmd
       FileUtils.mv(tmp, path)
     else
-      @warnings << "couldn't remove ICC profile (#{cmd}) (#{stderr_str})"
+      warning = "couldn't remove ICC profile (#{cmd}) (#{stderr_str})"
+      add_warning Error.new(warning, shipment.barcode_from_path(path), path)
     end
   end
 
@@ -251,7 +251,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     write_tiff_document_name(path, page1)
     match = /Software:\s(.+)/.match metadata
     if match.nil?
-      @warnings << "#{path}: could not extract software"
+      add_warning Error.new('could not extract software',
+                            shipment.barcode_from_path(path), path)
     else
       write_tiff_software(page1, match[1])
     end

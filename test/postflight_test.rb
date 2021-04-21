@@ -4,7 +4,7 @@
 require 'minitest/autorun'
 require 'postflight'
 
-class PostflightTest < Minitest::Test
+class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @options = { no_progress: true }
     @options[:config] = { feed_validate_script:
@@ -39,7 +39,8 @@ class PostflightTest < Minitest::Test
     metadata[:barcodes] << TestShipment.generate_barcode
     stage = Postflight.new(shipment, metadata, @options)
     stage.run
-    assert stage.errors.any?(/removed/), 'stage gripes about removed barcode'
+    assert stage.errors.any? { |e| /removed/.match? e.to_s },
+           'stage gripes about removed barcode'
   end
 
   def test_metadata_mismatch_added
@@ -50,7 +51,8 @@ class PostflightTest < Minitest::Test
     metadata[:barcodes].pop
     stage = Postflight.new(shipment, metadata, @options)
     stage.run
-    assert stage.errors.any?(/added/), 'stage gripes about added barcode'
+    assert stage.errors.any? { |e| /added/i.match? e.to_s },
+           'stage gripes about added barcode'
   end
 
   def test_feed_validate_error
@@ -61,12 +63,25 @@ class PostflightTest < Minitest::Test
     stage.run
     stage = Postflight.new(shipment, metadata, @options)
     stage.run
-    assert stage.errors.any?(/something\swent\swrong/),
+    assert stage.errors.any? { |e| /something\swent\swrong/i.match? e.to_s },
            'error(s) from feed validate'
     ENV.delete 'FAKE_FEED_VALIDATE_FAIL'
   end
 
-  def test_checksum_mismatch
+  def test_feed_validate_crash
+    ENV['FAKE_FEED_VALIDATE_CRASH'] = '1'
+    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
+    metadata = { barcodes: shipment.barcodes.clone }
+    stage = Preflight.new(shipment, metadata, @options)
+    stage.run
+    stage = Postflight.new(shipment, metadata, @options)
+    stage.run
+    assert(stage.errors.any? { |e| /returned\s1/i.match? e.to_s },
+           'nonzero feed validate exit status')
+    ENV.delete 'FAKE_FEED_VALIDATE_CRASH'
+  end
+
+  def test_checksum_mismatch # rubocop:disable Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
     metadata = {}
     stage = Preflight.new(shipment, metadata, @options)
@@ -76,10 +91,11 @@ class PostflightTest < Minitest::Test
     `echo 'test' > #{file}`
     stage = Postflight.new(shipment, metadata, @options)
     stage.run
-    assert stage.errors.any?(/checksum\smismatch/), 'checksum error generated'
+    assert stage.errors.any? { |e| /SHA\smismatch/i.match? e.to_s },
+           'checksum error generated'
   end
 
-  def test_file_missing
+  def test_file_missing # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
     metadata = {}
     stage = Preflight.new(shipment, metadata, @options)
@@ -89,10 +105,11 @@ class PostflightTest < Minitest::Test
     FileUtils.rm file
     stage = Postflight.new(shipment, metadata, @options)
     stage.run
-    assert stage.errors.any?(/file\smissing/), 'file missing error generated'
+    assert stage.errors.any? { |e| /file\smissing/i.match? e.to_s },
+           'file missing error generated'
   end
 
-  def test_file_added
+  def test_file_added # rubocop:disable Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
     metadata = {}
     stage = Preflight.new(shipment, metadata, @options)
@@ -102,6 +119,7 @@ class PostflightTest < Minitest::Test
     `echo 'test' > #{file}`
     stage = Postflight.new(shipment, metadata, @options)
     stage.run
-    assert stage.errors.any?(/file\sadded/), 'file added error generated'
+    assert stage.errors.any? { |e| /SHA\smissing/i.match? e.to_s },
+           'SHA missing error generated'
   end
 end
