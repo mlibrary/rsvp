@@ -29,7 +29,10 @@ class Processor # rubocop:disable Metrics/ClassLength
       puts 'Stage failed on previous run, aborting'.red
       return
     end
-    @shipment.restore_from_source_directory if @options[:restart_all]
+    if @options[:restart_all] && File.directory?(@shipment.source_directory)
+      # FIXME: this could be an expensive operation requiring a progress bar
+      @shipment.restore_from_source_directory
+    end
     stages.each do |stage|
       next unless @status[:stages][stage.name.to_sym].nil? ||
                   @status[:stages][stage.name.to_sym][:end].nil?
