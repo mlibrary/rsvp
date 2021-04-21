@@ -29,9 +29,7 @@ class Preflight < Stage
     end
     step = 0
     steps = 2 * @metadata[:barcodes].count
-    unless File.directory? source_directory
-      steps += @metadata[:barcodes].count
-    end
+    steps += @metadata[:barcodes].count unless File.directory? source_directory
     shipment.setup_source_directory do |barcode|
       write_progress(step, steps, "setup source/#{barcode}")
       step += 1
