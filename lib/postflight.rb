@@ -37,47 +37,51 @@ class Postflight < Stage
     script = @options[:config][:feed_validate_script]
     cmd = "perl #{script} google mdp #{dir} #{barcode}"
     log "running '#{cmd}'"
-    run_command(cmd)
+    err = run_command(cmd)
+    add_error Error.new(err, barcode) unless err.nil?
   end
 
   def check_barcode_lists(barcodes)
     s1 = Set.new @metadata[:barcodes]
     s2 = Set.new barcodes
-    @errors << "barcodes removed during run: #{s1 - s2}" if (s1 - s2).any?
-    @errors << "barcodes added during run: #{s2 - s1}" if (s2 - s1).any?
+    add_error Error.new("barcodes removed: #{s1 - s2}") if (s1 - s2).any?
+    add_error Error.new("barcodes added: #{s2 - s1}") if (s2 - s1).any?
   end
 
   def verify_source_checksums # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    @shipment.source_image_files.each do |path|
-      if @metadata[:checksums][path].nil?
-        @errors << "file added: no checksum for #{path}"
+    shipment.source_image_files.each do |image_file|
+      if @metadata[:checksums][image_file.path.to_sym].nil?
+        add_error Error.new('SHA missing', image_file.barcode, image_file.path)
       else
-        sha256 = Digest::SHA256.file path
-        if @metadata[:checksums][path] != sha256.hexdigest
-          @errors << "checksum mismatch: #{path} changed" \
-                     " from #{@metadata[:checksums][path]}" \
-                     " to #{sha256.hexdigest}"
+        sha256 = Digest::SHA256.file image_file.path
+        if @metadata[:checksums][image_file.path.to_sym] != sha256.hexdigest
+          desc = "SHA mismatch: #{@metadata[:checksums][image_file.path]}" \
+                 " vs #{sha256.hexdigest}"
+          add_error Error.new(desc, image_file.barcode, image_file.path)
         end
       end
     end
-    @metadata[:checksums].each_key do |path|
+    @metadata[:checksums].keys.map(&:to_s).each do |path|
       unless File.exist? path
-        @errors << "file missing: #{path} not found in source directory"
+        add_error Error.new('file missing', barcode_from_path(path), path)
       end
     end
   end
 
-  def run_command(cmd)
-    stdout_str, _stderr_str, code = Open3.capture3(cmd)
-    @errors << "'#{cmd}' returned #{code.exitstatus}" if code.exitstatus != 0
+  def run_command(cmd) # rubocop:disable Metrics/MethodLength
+    stdout_str, stderr_str, code = Open3.capture3(cmd)
+    if code.exitstatus != 0
+      return "'#{cmd}' returned #{code.exitstatus}: #{stderr_str}"
+    end
     return unless stdout_str.chomp.length.positive?
 
     err_lines = stdout_str.chomp.split("\n")
     err_lines.each do |line|
-      next if line == 'failure!' && @errors.any?
+      next if line == 'failure!' && errors.any?
       next if line == 'success!'
 
-      @errors << line
+      return line
     end
+    nil
   end
 end

@@ -9,12 +9,14 @@ class TIFFValidator < Stage
   BITONAL_RES = '600'
   CONTONE_RES = '400'
 
-  def run
-    image_files.each_with_index do |file, i|
-      write_progress(i, image_files.count, barcode_file_from_path(file))
-      fields = extract_tiff_fields(run_tiffinfo(file))
-      err = evaluate(file, fields)
-      @errors << err unless err.nil?
+  def run # rubocop:disable Metrics/AbcSize
+    image_files.each_with_index do |image_file, i|
+      write_progress(i, image_files.count, image_file.barcode_file)
+      fields = extract_tiff_fields run_tiffinfo(image_file)
+      err = evaluate fields
+      unless err.nil?
+        add_error Error.new(err, image_file.barcode, image_file.path)
+      end
     end
     write_progress(image_files.count, image_files.count)
   end
@@ -22,17 +24,18 @@ class TIFFValidator < Stage
   private
 
   # Run tiffinfo command and return output text block
-  def run_tiffinfo(path) # rubocop:disable Metrics/MethodLength
-    cmd = "tiffinfo #{path}"
+  def run_tiffinfo(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    cmd = "tiffinfo #{image_file.path}"
     stdout_str, stderr_str, code = Open3.capture3(cmd)
     if code.exitstatus != 0
-      @errors << "Command '#{cmd}' exited with status #{code.exitstatus}"
+      add_error Error.new("Command '#{cmd}' exited with status #{code}",
+                          image_file.barcode, image_file.path)
     end
     stderr_str.chomp.split("\n").each do |err|
-      if /tag\signored/.match? err
-        @warnings << "#{path}: #{err}"
+      if /warning/i.match? err
+        add_warning Error.new(err, image_file.barcode, image_file.path)
       else
-        @errors << "#{path}: #{err}"
+        add_error Error.new(err, image_file.barcode, image_file.path)
       end
     end
     stdout_str
@@ -43,30 +46,28 @@ class TIFFValidator < Stage
   # 'Samples/Pixel' line -> spp
   # bps of 1 requires spp=1 and xres=BITONAL_RES and yres=BITONAL_RES
   # bps of 8 requires spp in [1,3,4] and xres=CONTONE_RES and yres=CONTONE_RES
-  def evaluate(file, info) # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
+  def evaluate(info) # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
     if info[:res_unit] != 'pixels/inch'
-      return "#{file} must have pixels/inch resolution, not #{info[:res_unit]}"
+      return "must have pixels/inch resolution, not #{info[:res_unit]}"
     end
 
     case info[:bps]
     when '1'
-      if info[:spp] != '1'
-        return "#{file}\tCan't have SPP #{info[:spp]} with 1 BPS"
-      end
+      return "can't have SPP #{info[:spp]} with 1 BPS" if info[:spp] != '1'
 
       if info[:xres] != BITONAL_RES || info[:yres] != BITONAL_RES
-        "#{file}\t#{info[:xres]}x#{info[:yres]} bitonal"
+        "#{info[:xres]}x#{info[:yres]} bitonal"
       end
     when '8'
       if %w[1 3 4].include? info[:spp]
         if info[:xres] != CONTONE_RES || info[:yres] != CONTONE_RES
-          "#{file}\t#{info[:xres]}x#{info[:yres]} contone"
+          "#{info[:xres]}x#{info[:yres]} contone"
         end
       else
-        "#{file}\tCan't have SPP #{info[:spp]} with 8 BPS"
+        "can't have SPP #{info[:spp]} with 8 BPS"
       end
     else
-      "#{file}\tCan't have BPS #{info[:bps]}"
+      "can't have BPS #{info[:bps]}"
     end
   end
 

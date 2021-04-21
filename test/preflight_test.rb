@@ -24,11 +24,11 @@ class PreflightTest < Minitest::Test
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 BC T bitonal 1')
     stage = Preflight.new(shipment, metadata, @options)
     stage.run
-    assert_equal(0, stage.errors.count, 'stage runs without errors')
-    assert_equal(2, metadata[:barcodes].count,
-                 'correct number of barcodes in metadata')
-    assert_equal(2, metadata[:checksums].count,
-                 'correct number of checksums in metadata')
+    assert_equal 0, stage.errors.count, 'stage runs without errors'
+    assert_equal 2, metadata[:barcodes].count,
+                 'correct number of barcodes in metadata'
+    assert_equal 2, metadata[:checksums].count,
+                 'correct number of checksums in metadata'
   end
 
   def test_luhn
@@ -36,30 +36,31 @@ class PreflightTest < Minitest::Test
     stage = Preflight.new(shipment, {}, @options)
     stage.run
     assert_equal(1, stage.errors.count, 'stage runs with error')
-    assert(stage.warnings.any?(/Luhn/), 'stage warns about Luhn check')
+    assert stage.warnings.any? { |e| /Luhn/.match? e.to_s },
+           'stage warns about Luhn check'
   end
 
-  def test_remove_ds_store
+  def test_remove_ds_store # rubocop:disable Metrics/AbcSize
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
     ds_store = File.join(shipment.directory, shipment.barcodes[0], '.DS_Store')
     FileUtils.touch(ds_store)
     assert(File.exist?(ds_store), '.DS_Store file created')
     stage = Preflight.new(shipment, {}, @options)
     stage.run
-    assert(stage.warnings.any?(/\.DS_Store/),
-           'stage warns about removed .DS_Store')
-    refute(File.exist?(ds_store), '.DS_Store file removed')
+    assert stage.warnings.any? { |e| /\.DS_Store/.match? e.to_s },
+           'stage warns about removed .DS_Store'
+    refute File.exist?(ds_store), '.DS_Store file removed'
   end
 
-  def test_remove_thumbs_db
+  def test_remove_thumbs_db # rubocop:disable Metrics/AbcSize
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
     thumbs = File.join(shipment.directory, shipment.barcodes[0], 'Thumbs.db')
     FileUtils.touch(thumbs)
-    assert(File.exist?(thumbs), 'Thumbs.db file created')
+    assert File.exist?(thumbs), 'Thumbs.db file created'
     stage = Preflight.new(shipment, {}, @options)
     stage.run
-    assert(stage.warnings.any?(/Thumbs\.db/),
-           'stage warns about removed .DS_Store')
+    assert stage.warnings.any? { |e| /Thumbs\.db/i.match? e.to_s },
+           'stage warns about removed .DS_Store'
     refute(File.exist?(thumbs), 'Thumbs.db file removed')
   end
 
@@ -67,11 +68,11 @@ class PreflightTest < Minitest::Test
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
     ds_store = File.join(shipment.directory, '.DS_Store')
     FileUtils.touch(ds_store)
-    assert(File.exist?(ds_store), '.DS_Store file created')
+    assert File.exist?(ds_store), '.DS_Store file created'
     stage = Preflight.new(shipment, {}, @options)
     stage.run
-    assert(stage.warnings.any?(/\.DS_Store/),
-           'stage warns about removed .DS_Store')
+    assert stage.warnings.any? { |e| /\.DS_Store/.match? e.to_s },
+           'stage warns about removed .DS_Store'
     refute(File.exist?(ds_store), '.DS_Store file removed')
   end
 
@@ -79,12 +80,12 @@ class PreflightTest < Minitest::Test
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
     thumbs = File.join(shipment.directory, 'Thumbs.db')
     FileUtils.touch(thumbs)
-    assert(File.exist?(thumbs), 'Thumbs.db file created')
+    assert File.exist?(thumbs), 'Thumbs.db file created'
     stage = Preflight.new(shipment, {}, @options)
     stage.run
-    assert(stage.warnings.any?(/Thumbs\.db/),
-           'stage warns about removed .DS_Store')
-    refute(File.exist?(thumbs), 'Thumbs.db file removed')
+    assert stage.warnings.any? { |e| /Thumbs\.db/i.match? e.to_s },
+           'stage warns about removed .DS_Store'
+    refute File.exist?(thumbs), 'Thumbs.db file removed'
   end
 
   def test_barcode_directory_errors_and_warnings # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -95,21 +96,21 @@ class PreflightTest < Minitest::Test
     Dir.mkdir(File.join(shipment.directory, shipment.barcodes[0], 'spurious_d'))
     stage = Preflight.new(shipment, {}, @options)
     stage.run
-    assert(stage.errors.any?(/spurious_file/),
-           'stage fails with unknown file')
-    assert(stage.errors.any?(/spurious_d/),
-           'stage fails with barcode subdirectory')
-    assert(stage.warnings.any?(/md5\signored/),
-           'stage warns about ignored checksum.md5 file')
+    assert stage.errors.any? { |e| /spurious_file/.match? e.to_s },
+           'stage fails with unknown file'
+    assert stage.errors.any? { |e| /spurious_d/.match? e.to_s },
+           'stage fails with barcode subdirectory'
+    assert stage.warnings.any? { |e| /ignored/i.match? e.to_s },
+           'stage warns about ignored checksum.md5 file'
   end
 
   def test_shipment_directory_errors
     shipment = TestShipment.new(test_name, 'F spurious_file')
     stage = Preflight.new(shipment, {}, @options)
     stage.run
-    assert(stage.errors.any?(/no\sbarcode\sdirectories/),
-           'stage fails with no barcode directories')
-    assert(stage.errors.any?(/spurious_file/),
-           'stage fails with unknown file')
+    assert stage.errors.any? { |e| /no\sbarcode\sdirectories/.match? e.to_s },
+           'stage fails with no barcode directories'
+    assert stage.errors.any? { |e| /spurious_file/.match? e.to_s },
+           'stage fails with unknown file'
   end
 end

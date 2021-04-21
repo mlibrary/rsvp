@@ -22,18 +22,18 @@ class Preflight < Stage
 
   def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     @metadata[:barcodes] = []
-    @shipment.setup_source_directory
+    shipment.setup_source_directory
     checksum_source_directory
     validate_shipment_directory
     if @metadata[:barcodes].none?
-      @errors << "no barcode directories in #{shipment_directory}"
+      add_error Error.new("no barcode directories in #{shipment_directory}")
     end
     @metadata[:barcodes].each_with_index do |barcode, i|
       unless Luhn.valid? barcode
-        @warnings << "Luhn checksum failed for barcode #{barcode}"
+        add_warning Error.new('Luhn checksum failed', barcode)
       end
       write_progress(i, @metadata[:barcodes].count, barcode)
-      validate_barcode_directory File.join(shipment_directory, barcode)
+      validate_barcode_directory barcode
     end
     write_progress(@metadata[:barcodes].count, @metadata[:barcodes].count)
     cleanup
@@ -41,9 +41,9 @@ class Preflight < Stage
 
   # Add SHA256 entries to @metadata for each source/barcode/file.
   def checksum_source_directory
-    @shipment.source_image_files.each do |path|
-      sha256 = Digest::SHA256.file path
-      (@metadata[:checksums] ||= {})[path] = sha256.hexdigest
+    shipment.source_image_files.each do |image_file|
+      sha256 = Digest::SHA256.file image_file.path
+      (@metadata[:checksums] ||= {})[image_file.path.to_sym] = sha256.hexdigest
     end
   end
 
@@ -53,7 +53,7 @@ class Preflight < Stage
   # a source directory, and status.json
   def validate_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     Dir.entries(shipment_directory).sort.each do |entry|
-      next if %w[. ..].include? entry
+      next if %w[. .. source tmp].include? entry
       next if entry == 'status.json'
 
       path = File.join(shipment_directory, entry)
@@ -62,10 +62,10 @@ class Preflight < Stage
       if File.directory? path
         @metadata[:barcodes] << entry
       elsif self.class.removable_files.include? entry
-        @warnings << "#{path} deleted"
+        add_warning Error.new("#{path} deleted")
         delete_on_success path
       else
-        @errors << "unknown file #{path}"
+        add_error Error.new("unknown file #{path}")
       end
     end
   end
@@ -73,25 +73,25 @@ class Preflight < Stage
   # Barcode directory must include one or more TIFF files,
   # and a few other exceptions grandfathered by just_do_everything.sh
   # No directories are allowed
-  def validate_barcode_directory(dir) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def validate_barcode_directory(barcode) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     have_tiff = false
-    Dir.entries(dir).sort.each do |entry|
+    Dir.entries(File.join(shipment_directory, barcode)).sort.each do |entry|
       next if %w[. ..].include? entry
 
-      path = File.join(dir, entry)
+      path = File.join(shipment_directory, barcode, entry)
       if File.directory? path
-        @errors << "subdirectory '#{entry}' found in barcode directory #{dir}"
+        add_error Error.new("illegal subdirectory '#{entry}' in barcode", entry)
       elsif self.class::TIFF_REGEX.match? entry
         have_tiff = true
       elsif self.class.ignorable_files.include? entry
-        @warnings << "#{path} ignored"
+        add_warning Error.new('file ignored', barcode, path)
       elsif self.class.removable_files.include? entry
-        @warnings << "#{path} deleted"
+        add_warning Error.new('file deleted', barcode, path)
         delete_on_success path
       else
-        @errors << "unknown file #{path}"
+        add_error Error.new('unknown file', barcode, path)
       end
     end
-    @errors << "no TIFF files in barcode directory #{dir}" unless have_tiff
+    add_error Error.new('no TIFF files found', barcode) unless have_tiff
   end
 end

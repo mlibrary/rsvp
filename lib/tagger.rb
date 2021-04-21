@@ -8,11 +8,14 @@ require 'tag_data'
 # The only thing that is required here is that the artist tag for 'dcu'
 # is applied to all files that don't have it.
 class Tagger < Stage
-  def run
+  def run # rubocop:disable Metrics/AbcSize
     @barcode_to_tempdir = {}
-    image_files.each_with_index do |file, i|
-      write_progress(i, image_files.count, barcode_file_from_path(file))
-      tag file
+    calculate_tags
+    return if errors.count.positive?
+
+    image_files.each_with_index do |image_file, i|
+      write_progress(i, image_files.count, image_file.barcode_file)
+      tag image_file
     end
     write_progress(image_files.count, image_files.count)
     cleanup
@@ -20,76 +23,90 @@ class Tagger < Stage
 
   private
 
-  # Sets artist and orientation if they are not already set.
-  def tag(path)
-    tagged = File.join(tempdir_for_file(path), File.basename(path) + '.tagged')
-    FileUtils.cp(path, tagged)
-    copy_on_success(tagged, path)
+  def calculate_tags # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    artist = @options[:tagger_artist] || 'dcu'
+    @artist_tag ||= if TagData::ARTIST[artist].nil?
+                      add_warning Error.new("using custom artist '#{artist}'")
+                      artist
+                    else
+                      TagData::ARTIST[artist]
+                    end
+    scanner = @options[:tagger_scanner]
+    unless scanner.nil?
+      if TagData::SCANNER[scanner].nil?
+        unless /\|/.match? scanner
+          add_error Error.new("user-defined scanner not in 'make|model' format")
+          return
+        end
+
+        add_warning Error.new("using custom scanner '#{scanner}'")
+        @make_tag, @model_tag = scanner.split('|')
+      else
+        @make_tag, @model_tag = TagData::SCANNER[scanner]
+      end
+    end
+    software = @options[:tagger_software]
+    return if software.nil?
+
+    if TagData::SOFTWARE[software].nil?
+      add_warning Error.new("using custom software '#{software}'")
+      @software_tag = software
+    else
+      @software_tag = TagData::SOFTWARE[software]
+    end
+  end
+
+  def tag(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    tagged_name = image_file.path.split(File::SEPARATOR)[-1] + '.tagged'
+    tagged_path = File.join(tempdir_for_file(image_file), tagged_name)
+    tagged = ImageFile.new(image_file.barcode, tagged_path,
+                           File.join(image_file.barcode,
+                                     image_file.path + '.tagged'))
+    FileUtils.cp(image_file.path, tagged_path)
+    copy_on_success(tagged_path, image_file.path)
     tag_artist tagged
     tag_scanner tagged
     tag_software tagged
     run_tiffset(tagged, 274, '1')
   end
 
-  def tag_artist(path)
-    artist = @options[:tagger_artist] || 'dcu'
-    if TagData::ARTIST[artist].nil?
-      @warnings << "using custom artist '#{artist}'"
-      tag = artist
-    else
-      tag = TagData::ARTIST[artist]
-    end
-    run_tiffset(path, 315, tag)
+  def tag_artist(image_file)
+    run_tiffset(image_file, 315, @artist_tag) unless @artist_tag.nil?
   end
 
-  def tag_scanner(path) # rubocop:disable Metrics/MethodLength
-    scanner = @options[:tagger_scanner] || return
-    if TagData::SCANNER[scanner].nil?
-      unless /\|/.match? scanner
-        @errors << "user-defined scanner must be pipe-delimited 'make|model'"
-        return
-      end
-
-      @warnings << "using custom scanner '#{scanner}'"
-      make, model = scanner.split('|')
-    else
-      make, model = TagData::SCANNER[scanner]
-    end
-    run_tiffset(path, 271, make)
-    run_tiffset(path, 272, model)
+  def tag_scanner(image_file)
+    run_tiffset(image_file, 271, @make_tag) unless @make_tag.nil?
+    run_tiffset(image_file, 272, @model_tag) unless @model_tag.nil?
   end
 
-  def tag_software(path)
-    software = @options[:tagger_software] || return
-    if TagData::SOFTWARE[software].nil?
-      @warnings << "using custom software '#{software}'"
-      tag = software
-    else
-      tag = TagData::SOFTWARE[software]
-    end
-    run_tiffset(path, 305, tag)
+  def tag_software(image_file)
+    run_tiffset(image_file, 305, @software_tag) unless @software_tag.nil?
   end
 
-  def tempdir_for_file(path)
-    barcode = barcode_from_path path
-    return @barcode_to_tempdir[barcode] if @barcode_to_tempdir.key? barcode
+  def tempdir_for_file(image_file)
+    if @barcode_to_tempdir.key? image_file.barcode
+      return @barcode_to_tempdir[image_file.barcode]
+    end
 
     dir = create_tempdir
-    @barcode_to_tempdir[barcode] = dir
+    @barcode_to_tempdir[image_file] = dir
     dir
   end
 
-  def run_tiffset(file, tag, value) # rubocop:disable Metrics/MethodLength
-    cmd = "tiffset -s #{tag} '#{value}' #{file}"
+  def run_tiffset(image_file, tag, value) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    cmd = "tiffset -s #{tag} '#{value}' #{image_file.path}"
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
-      @errors << "'#{cmd}': exited with status #{code.exitstatus}"
+      add_error Error.new("'#{cmd}': exited with status #{code}",
+                          image_file.barcode, image_file.path)
     end
     stderr_str.chomp.split("\n").each do |err|
       if /tag\signored/.match? err
-        @warnings << "#{cmd}: #{err}"
+        add_warning Error.new("#{cmd}: #{err}", image_file.barcode,
+                              image_file.path)
       else
-        @errors << "#{cmd}: #{err}"
+        add_error Error.new("#{cmd}: #{err}", image_file.barcode,
+                            image_file.path)
         next
       end
     end
