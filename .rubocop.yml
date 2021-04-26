@@ -86,6 +86,8 @@ Style/RedundantArgument:
   Enabled: true
 Style/SlicingWithRange:
   Enabled: true
+Style/StringChars:
+  Enabled: true
 Style/StringConcatenation:
   Enabled: false
 Style/SwapValues:
