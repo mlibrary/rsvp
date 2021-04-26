@@ -9,17 +9,15 @@ class Stage # rubocop:disable Metrics/ClassLength
   attr_reader :data
   attr_accessor :name, :shipment
 
-  def initialize(shipment, metadata, options = {}) # rubocop:disable Metrics/MethodLength
+  def initialize(shipment, options = {}) # rubocop:disable Metrics/MethodLength
     unless shipment.is_a? Shipment
       raise StandardError,
             "shipment class #{shipment.class} for #{self.class}#initialize"
     end
-    raise "nil metadata passed to #{self.class}#initialize" if metadata.nil?
     raise "nil options passed to #{self.class}#initialize" if options.nil?
 
     @name = self.class.to_s
     @shipment = shipment
-    @metadata = metadata # Read-write information about the shipment
     @options = options # Hash of command-line arguments
     # FIXME: change this back to @errors when tests are passing,
     # maybe restore attr_reader

@@ -9,7 +9,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     TestShipment.remove_test_shipments
   end
 
-  def test_new # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def test_new
     shipment = TestShipment.new(test_name)
     processor = Processor.new(shipment.directory, {})
     refute_nil processor, 'processor successfully created'
@@ -19,8 +19,6 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     processor.write_status
     assert File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json created'
-    metadata = processor.status[:metadata]
-    assert metadata, 'processor metadata initialized'
   end
 
   def test_config

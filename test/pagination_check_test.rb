@@ -15,13 +15,13 @@ class PaginationCheckTest < Minitest::Test
 
   def test_new
     shipment = TestShipment.new(test_name)
-    stage = PaginationCheck.new(shipment, {}, @options)
+    stage = PaginationCheck.new(shipment, @options)
     refute_nil stage, 'stage successfully created'
   end
 
   def test_run
     shipment = TestShipment.new(test_name, 'BC T bitonal 1-5')
-    stage = PaginationCheck.new(shipment, {}, @options)
+    stage = PaginationCheck.new(shipment, @options)
     stage.run
     assert(stage.errors.none?, 'no errors')
     assert(stage.warnings.none?, 'no warnings')
@@ -29,7 +29,7 @@ class PaginationCheckTest < Minitest::Test
 
   def test_missing
     shipment = TestShipment.new(test_name, 'BC T bitonal 1-2 T bitonal 4-5')
-    stage = PaginationCheck.new(shipment, {}, @options)
+    stage = PaginationCheck.new(shipment, @options)
     stage.run
     assert(stage.errors.count == 1, 'one missing page error')
     assert_match(/missing/, stage.errors[0].description,
@@ -38,7 +38,7 @@ class PaginationCheckTest < Minitest::Test
 
   def test_missing_range
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 T bitonal 5')
-    stage = PaginationCheck.new(shipment, {}, @options)
+    stage = PaginationCheck.new(shipment, @options)
     stage.run
     assert(stage.errors.count == 1, 'one missing page range error')
     assert_match(/2-4/, stage.errors[0].description, 'error contains range')
@@ -46,7 +46,7 @@ class PaginationCheckTest < Minitest::Test
 
   def test_duplicate
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 J contone 1')
-    stage = PaginationCheck.new(shipment, {}, @options)
+    stage = PaginationCheck.new(shipment, @options)
     stage.run
     assert(stage.errors.count == 1, 'one error from duplicate page')
     assert_match(/duplicate/, stage.errors[0].description,

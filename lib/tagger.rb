@@ -89,7 +89,7 @@ class Tagger < Stage
     end
 
     dir = create_tempdir
-    @barcode_to_tempdir[image_file] = dir
+    @barcode_to_tempdir[image_file.barcode] = dir
     dir
   end
 

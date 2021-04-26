@@ -1,16 +1,37 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'json'
+
 ImageFile = Struct.new(:barcode, :path, :barcode_file)
 
 # Shipment directory class
 class Shipment
   attr_reader :metadata
 
-  def initialize(dir)
+  def self.json_create(hash)
+    new hash['data']['dir'], hash['data']['metadata']
+  end
+
+  def initialize(dir, metadata = nil)
     raise 'nil dir passed to Shipment#initialize' if dir.nil?
 
     @dir = dir
+    @metadata = metadata || {}
+    # Symbolize top-level metadata keys
+    @metadata.keys.each do |key| # rubocop:disable Style/HashEachMethods
+      if key.is_a? String
+        @metadata[key.to_sym] = @metadata[key]
+        @metadata.delete key
+      end
+    end
+  end
+
+  def to_json(*args)
+    {
+      'json_class' => self.class.name,
+      'data' => { dir: @dir, metadata: @metadata }
+    }.to_json(*args)
   end
 
   def directory
@@ -26,32 +47,25 @@ class Shipment
   end
 
   def barcode_directories
-    @barcode_directories ||= barcodes.map { |b| File.join(@dir, b) }
+    barcodes.map { |b| File.join(@dir, b) }
   end
 
   def barcodes
-    @barcodes ||= begin
-      bars = Dir.entries(@dir).reject do |b|
-        %w[. .. source tmp].include? b
-      end
-      bars.select { |b| File.directory?(File.join(@dir, b)) }.sort
+    bars = Dir.entries(@dir).reject do |b|
+      %w[. .. source tmp].include? b
     end
+    bars.select { |b| File.directory?(File.join(@dir, b)) }.sort
   end
 
   def source_barcode_directories
-    @source_barcode_directories ||= source_barcodes.map do |b|
-      File.join(@dir, b)
-    end
+    source_barcodes.map { |b| File.join(@dir, b) }
   end
 
   def source_barcodes
-    @source_barcodes ||= begin
-      bars = Dir.entries(source_directory).reject do |b|
-        %w[. .. .DS_Store source tmp].include? b
-      end
-      bars.select { |b| File.directory?(File.join(@dir, b)) }
-      bars.sort
+    bars = Dir.entries(source_directory).reject do |b|
+      %w[. .. .DS_Store source tmp].include? b
     end
+    bars.select { |b| File.directory?(File.join(@dir, b)) }.sort
   end
 
   # FIXME: these may not be used any more

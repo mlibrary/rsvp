@@ -21,15 +21,17 @@ class Preflight < Stage
   end
 
   def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    @metadata[:barcodes] = []
+    shipment.metadata[:initial_barcodes] = []
     validate_shipment_directory
-    if @metadata[:barcodes].none?
+    if shipment.metadata[:initial_barcodes].none?
       add_error Error.new("no barcode directories in #{shipment_directory}")
       return
     end
     step = 0
-    steps = 2 * @metadata[:barcodes].count
-    steps += @metadata[:barcodes].count unless File.directory? source_directory
+    steps = 2 * shipment.metadata[:initial_barcodes].count
+    unless File.directory? source_directory
+      steps += shipment.metadata[:initial_barcodes].count
+    end
     shipment.setup_source_directory do |barcode|
       write_progress(step, steps, "setup source/#{barcode}")
       step += 1
@@ -38,7 +40,7 @@ class Preflight < Stage
       write_progress(step, steps, "checksum source/#{barcode}")
       step += 1
     end
-    @metadata[:barcodes].each_with_index do |barcode, i|
+    shipment.metadata[:initial_barcodes].each_with_index do |barcode, i|
       unless Luhn.valid? barcode
         add_warning Error.new('Luhn checksum failed', barcode)
       end
@@ -49,16 +51,17 @@ class Preflight < Stage
     cleanup
   end
 
-  # Add SHA256 entries to @metadata for each source/barcode/file.
-  def checksum_source_directory # rubocop:disable Metrics/AbcSize
+  # Add SHA256 entries to shipment metadata for each source/barcode/file.
+  def checksum_source_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     last_barcode = nil
+    shipment.metadata[:checksums] = {} if shipment.metadata[:checksums].nil?
     shipment.source_image_files.each do |image_file|
       if block_given? && (last_barcode.nil? ||
                           last_barcode != image_file.barcode)
         yield image_file.barcode
       end
       sha256 = Digest::SHA256.file image_file.path
-      (@metadata[:checksums] ||= {})[image_file.path.to_sym] = sha256.hexdigest
+      shipment.metadata[:checksums][image_file.path] = sha256.hexdigest
       last_barcode = image_file.barcode
     end
   end
@@ -76,7 +79,7 @@ class Preflight < Stage
       next if entry == 'source' && File.directory?(path)
 
       if File.directory? path
-        @metadata[:barcodes] << entry
+        shipment.metadata[:initial_barcodes] << entry
       elsif self.class.removable_files.include? entry
         add_warning Error.new("#{path} deleted")
         delete_on_success path
