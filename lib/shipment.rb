@@ -77,8 +77,6 @@ class Shipment
     path.split(File::SEPARATOR)[-2..].join(File::SEPARATOR)
   end
 
-  # Think twice about trying to memoize this.
-  # Compression will change the names of image files if not the quantity.
   def image_files(type = 'tif')
     files = []
     barcodes.each do |b|

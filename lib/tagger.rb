@@ -8,16 +8,17 @@ require 'tag_data'
 # The only thing that is required here is that the artist tag for 'dcu'
 # is applied to all files that don't have it.
 class Tagger < Stage
-  def run # rubocop:disable Metrics/AbcSize
+  def run(agenda = shipment.barcodes) # rubocop:disable Metrics/AbcSize
     @barcode_to_tempdir = {}
     calculate_tags
     return if errors.count.positive?
 
-    image_files.each_with_index do |image_file, i|
+    files = image_files.select { |file| agenda.include? file.barcode }
+    files.each_with_index do |image_file, i|
       write_progress(i, image_files.count, image_file.barcode_file)
       tag image_file
     end
-    write_progress(image_files.count, image_files.count)
+    write_progress(files.count, files.count)
     cleanup
   end
 
@@ -63,7 +64,7 @@ class Tagger < Stage
                            File.join(image_file.barcode,
                                      image_file.path + '.tagged'))
     FileUtils.cp(image_file.path, tagged_path)
-    copy_on_success(tagged_path, image_file.path)
+    copy_on_success(tagged_path, image_file.path, image_file.barcode)
     tag_artist tagged
     tag_scanner tagged
     tag_software tagged
@@ -88,9 +89,7 @@ class Tagger < Stage
       return @barcode_to_tempdir[image_file.barcode]
     end
 
-    dir = create_tempdir
-    @barcode_to_tempdir[image_file.barcode] = dir
-    dir
+    @barcode_to_tempdir[image_file.barcode] = create_tempdir
   end
 
   def run_tiffset(image_file, tag, value) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength

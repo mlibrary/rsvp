@@ -59,10 +59,24 @@ rescue JSON::ParserError => e
   exit 1
 end
 
-begin
-  processor.run
-rescue Interrupt
-  puts "\nInterrupted".red
-ensure
-  processor.write_status
+
+ARGV.each do |dir|
+  dir = Pathname.new(dir).cleanpath.to_s
+  unless File.exist?(dir) && File.directory?(dir)
+    puts "Shipment directory #{dir.bold} does not exist, skipping".red
+    next
+  end
+  begin
+    processor = Processor.new(dir, options)
+  rescue JSON::ParserError => e
+    puts "unable to parse #{File.join(dir, status.json)}: #{e}"
+    next
+  end
+  begin
+    processor.run
+  rescue Interrupt
+    puts "\nInterrupted".red
+  ensure
+    processor.write_status
+  end
 end

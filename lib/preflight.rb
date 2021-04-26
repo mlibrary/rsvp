@@ -20,7 +20,7 @@ class Preflight < Stage
        checksum.md5 prodnote.tif]
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def run(_agenda = shipment.barcodes) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment.metadata[:initial_barcodes] = []
     validate_shipment_directory
     if shipment.metadata[:initial_barcodes].none?

@@ -5,13 +5,13 @@ require 'stage'
 
 # Pagination Stage
 class PaginationCheck < Stage
-  def run
+  def run(agenda = shipment.barcodes)
     @re = /^([0-9]{8})\.(?:tif|jp2)$/
-    barcode_directories.each_with_index do |barcode, i|
+    agenda.each_with_index do |barcode, i|
       write_progress(i, barcode_directories.count, barcode)
       find_errors_in_dir(barcode)
     end
-    write_progress(barcode_directories.count, barcode_directories.count)
+    write_progress(agenda.count, agenda.count)
   end
 
   private

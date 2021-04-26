@@ -7,22 +7,24 @@ require 'stage'
 
 # Image Metadata Validation Stage
 class Postflight < Stage
-  def run
-    process_shipment_directory
+  def run(agenda = shipment.barcodes)
+    process_shipment_directory agenda
   end
 
   private
 
-  def process_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def process_shipment_directory(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     real_barcodes = []
     barcode_directories.each_with_index do |path, i|
       barcode = path.split(File::SEPARATOR)[-1]
+      real_barcodes << barcode
+      unless agenda.include? barcode
+        write_progress(i, barcode_directories.count, "#{barcode} skipped")
+        next
+      end
       write_progress(i, barcode_directories.count + 2,
                      "feed validate #{barcode}")
-      if File.directory? path
-        process_barcode_directory(path, barcode)
-        real_barcodes << barcode
-      end
+      process_barcode_directory(path, barcode)
     end
     write_progress(barcode_directories.count, barcode_directories.count + 2,
                    'barcode check')

@@ -10,15 +10,34 @@ $LOAD_PATH << File.join(APP_ROOT, 'lib')
 require 'string_color'
 require 'processor'
 
+options_data = [['-c', '--config-dir', :config_dir,
+                 'Directory for configuration files'],
+                ['-r', '--reset', :reset,
+                 'Reset and try last failed stage'],
+                ['-R', '--restart-all', :restart_all,
+                 'Discard status.json and restart all stages'],
+                ['-v', '--verbose', :verbose,
+                 'Run verbosely'],
+                ['-1', '--one-stage', :one_stage,
+                 'Run one stage and then stop'],
+                [:OPTIONAL, '--tagger-scanner=SCANNER', :tagger_scanner,
+                 'Set scanner tag to SCANNER'],
+                [:OPTIONAL, '--tagger-software=SOFTWARE', :tagger_software,
+                 'Set scan software tag to SOFTWARE'],
+                [:OPTIONAL, '--tagger-artist=ARTIST', :tagger_artist,
+                 'Set artist tag to ARTIST']]
 options = {}
+
 OptionParser.new do |opts|
   opts.banner = "Usage: #{$PROGRAM_NAME} [options] DIR [DIR...]"
 
-  opts.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
-    options[:verbose] = v
+  options_data.each do |vals|
+    opts.on(vals[0], vals[1], vals[3]) do |v|
+      options[vals[2]] = v
+    end
   end
 
-  if ARGV.empty? || ARGV.count > 1
+  if ARGV.count != 1
     puts opts.help
     exit 1
   end
@@ -26,22 +45,19 @@ end.parse!
 
 dir = Pathname.new(ARGV[0]).cleanpath.to_s
 unless File.exist?(dir) && File.directory?(dir)
-  puts "Shipment directory #{dir.bold} does not exist, skipping".red
-  exit
-end
-unless File.exist?(File.join(dir, 'status.json'))
-  puts "No status.json found in #{dir.bold}, skipping".red
-  exit
+  puts "Shipment directory #{dir.bold} does not exist".red
+  exit 1
 end
 begin
   processor = Processor.new(dir, options)
 rescue JSON::ParserError => e
   puts "unable to parse #{File.join(dir, status.json)}: #{e}"
-  exit
+  exit 1
 end
 
 commands = ['barcodes', 'errors', 'exit', 'help', 'ls', 'metadata', 'quit',
-            'ruby', 'status', '?']
+            'run', 'status', '?']
+
 completions = commands + processor.shipment.barcodes
 Readline.completion_append_character = ' '
 Readline.completion_proc = proc do |str|
@@ -56,6 +72,7 @@ command_summary = <<~COMMANDS
   help               Print this message      ?
   metadata           Show metadata summary
   quit               Quit the program        exit
+  run                Run processor
   status             Query shipment status
   warnings [BARCODE] List shipment warnings
   ==============================================================
@@ -67,6 +84,13 @@ begin
     cmd, *args = line.split
     begin
       case cmd
+      when 'agenda'
+        processor.stages.each do |stage|
+          puts stage.name.bold
+          processor.agenda[stage.name].each do |barcode|
+            puts "  #{barcode}".bold
+          end
+        end
       when 'barcodes', 'ls'
         processor.shipment.barcodes.each do |b|
           puts b.bold
@@ -90,6 +114,14 @@ begin
         puts processor.metadata_query.brown
       when 'quit', 'exit'
         break
+      when 'run'
+        begin
+          processor.run
+        rescue Interrupt
+          puts "\nInterrupted".red
+        ensure
+          processor.write_status
+      end
       when 'status'
         processor.query
       when 'warnings'
@@ -114,5 +146,5 @@ begin
   end
 rescue Interrupt
   puts 'Goodbye'.blue
-  exit
+  exit 0
 end
