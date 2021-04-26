@@ -60,7 +60,7 @@ class Shipment
   end
 
   def barcode_file_from_path(path)
-    path.split(File::SEPARATOR)[-2..-1].join(File::SEPARATOR)
+    path.split(File::SEPARATOR)[-2..].join(File::SEPARATOR)
   end
 
   # Think twice about trying to memoize this.
