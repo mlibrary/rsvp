@@ -42,7 +42,7 @@ class Postflight < Stage
   end
 
   def check_barcode_lists(barcodes)
-    s1 = Set.new @metadata[:barcodes]
+    s1 = Set.new shipment.metadata[:initial_barcodes]
     s2 = Set.new barcodes
     add_error Error.new("barcodes removed: #{s1 - s2}") if (s1 - s2).any?
     add_error Error.new("barcodes added: #{s2 - s1}") if (s2 - s1).any?
@@ -50,18 +50,18 @@ class Postflight < Stage
 
   def verify_source_checksums # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment.source_image_files.each do |image_file|
-      if @metadata[:checksums][image_file.path.to_sym].nil?
+      checksum = shipment.metadata[:checksums][image_file.path]
+      if checksum.nil?
         add_error Error.new('SHA missing', image_file.barcode, image_file.path)
       else
         sha256 = Digest::SHA256.file image_file.path
-        if @metadata[:checksums][image_file.path.to_sym] != sha256.hexdigest
-          desc = "SHA mismatch: #{@metadata[:checksums][image_file.path]}" \
-                 " vs #{sha256.hexdigest}"
+        if checksum != sha256.hexdigest
+          desc = "SHA mismatch: #{checksum} vs #{sha256.hexdigest}"
           add_error Error.new(desc, image_file.barcode, image_file.path)
         end
       end
     end
-    @metadata[:checksums].keys.map(&:to_s).each do |path|
+    shipment.metadata[:checksums].keys.map(&:to_s).each do |path|
       unless File.exist? path
         add_error Error.new('file missing', barcode_from_path(path), path)
       end

@@ -18,7 +18,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     @shipment = Shipment.new(dir)
     @options = options
     @options[:config] = config
-    @status = { stages: {}, metadata: {} }
+    @status = { stages: {} }
     init_status_file
   end
 
@@ -75,7 +75,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     config[:stages].each do |s|
       require s[:file]
       stage_class = Object.const_get(s[:class])
-      stage = stage_class.new(@shipment, @status[:metadata], @options)
+      stage = stage_class.new(@shipment, @options)
       stage.name = s[:name]
       @stages << stage
     end
@@ -102,7 +102,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     return @error_query unless @error_query.nil?
 
     @error_query = {}
-    (@status[:metadata][:barcodes] + [nil]).each do |b|
+    (@shipment.barcodes + [nil]).each do |b|
       stages.each do |stage|
         stage_status = @status[:stages][stage.name.to_sym]
         next if stage_status.nil?
@@ -121,7 +121,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     return @warning_query unless @warning_query.nil?
 
     @warning_query = {}
-    (@status[:metadata][:barcodes] + [nil]).each do |b|
+    (@shipment.barcodes + [nil]).each do |b|
       stages.each do |stage|
         stage_status = @status[:stages][stage.name.to_sym]
         next if stage_status.nil?
@@ -148,17 +148,17 @@ class Processor # rubocop:disable Metrics/ClassLength
     removed = []
     changed = []
     @shipment.source_image_files.each do |image_file|
-      if @status[:metadata][:checksums][image_file.path.to_sym].nil?
+      if @shipment.metadata[:checksums][image_file.path].nil?
         added << image_file.path
       else
         sha256 = Digest::SHA256.file image_file.path
-        if @status[:metadata][:checksums][image_file.path.to_sym] !=
+        if @shipment.metadata[:checksums][image_file.path] !=
            sha256.hexdigest
           changed << image_file.path
         end
       end
     end
-    @status[:metadata][:checksums].keys.map(&:to_s).each do |path|
+    @shipment.metadata[:checksums].keys.map(&:to_s).each do |path|
       removed << path unless File.exist? path.to_s
     end
     "Source directory changes: #{added.count} added," \
@@ -172,7 +172,8 @@ class Processor # rubocop:disable Metrics/ClassLength
   def write_status
     puts "Writing status file #{status_file}" if @options[:verbose]
     File.open(status_file, 'w') do |f|
-      f.write JSON.pretty_generate(@status)
+      f.write JSON.pretty_generate(shipment: @shipment,
+                                   stages: @status[:stages])
     end
   end
 
@@ -219,7 +220,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     errors
   end
 
-  def init_status_file
+  def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/PerceivedComplexity
     return unless File.exist? status_file
 
     if @options[:restart_all]
@@ -231,6 +232,17 @@ class Processor # rubocop:disable Metrics/ClassLength
       @status = symbolize JSON.load File.new(status_file)
       # rubocop:enable Security/JSONLoad
       raise JSON::ParserError, "unable to parse #{status_file}" if @status.nil?
+
+      # Support legacy 'metadata' in status struct
+      # This can be removed when backwards compatibility is no longer an issue.
+      # The delete calls are to expose code that relies on the old data layout.
+      if @status.key?(:shipment) && @status[:shipment].is_a?(Shipment)
+        @shipment = @status[:shipment]
+        @status.delete :shipment
+      elsif @status.key? :metadata
+        @shipment.metadata = @status[:metadata]
+        @status.delete :metadata
+      end
     end
   end
 
