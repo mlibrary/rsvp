@@ -23,7 +23,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     stages
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def run
     # Bail out with a message if any previous stage had an error.
     discard_failure if @options[:reset]
     if @options[:restart_all] && File.directory?(@shipment.source_directory)
@@ -65,7 +65,6 @@ class Processor # rubocop:disable Metrics/ClassLength
   def stages
     return @stages unless @stages.nil?
 
-    
     @stages = []
     config[:stages].each do |s|
       require s[:file]
@@ -122,6 +121,7 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def stage_status(stage)
+    raise "DON'T CALL stage_status ANY MORE"
     @status[:stages][stage.name.to_sym]
   end
 
@@ -149,7 +149,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     stage_status(stage)[:errors].uniq(&:barcode)
   end
 
-  def error_query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def error_query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     eq = {}
     (@status[:metadata][:barcodes] + [nil]).each do |b|
       stages.each do |stage|
@@ -169,10 +169,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     (@status[:metadata][:barcodes] + [nil]).each do |b|
       stages.each do |stage|
         next if stage_status(stage).nil?
-        if stage_status(stage)[:warnings].nil?
-          require 'byebug'
-          byebug
-        end
+
         warns = stage_status(stage)[:warnings].select { |e| e.barcode == b }
         next if warns.nil? || warns.none?
 

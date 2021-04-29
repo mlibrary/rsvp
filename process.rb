@@ -59,9 +59,8 @@ rescue JSON::ParserError => e
   exit 1
 end
 
-
-ARGV.each do |dir|
-  dir = Pathname.new(dir).cleanpath.to_s
+ARGV.each do |arg|
+  dir = Pathname.new(arg).cleanpath.to_s
   unless File.exist?(dir) && File.directory?(dir)
     puts "Shipment directory #{dir.bold} does not exist, skipping".red
     next

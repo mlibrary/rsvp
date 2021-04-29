@@ -121,7 +121,7 @@ begin
           puts "\nInterrupted".red
         ensure
           processor.write_status
-      end
+        end
       when 'status'
         processor.query
       when 'warnings'

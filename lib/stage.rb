@@ -10,6 +10,7 @@ require 'error'
 class Stage # rubocop:disable Metrics/ClassLength
   attr_reader :data, :errors, :warnings
   attr_accessor :name, :options, :shipment, :start, :end
+
   def self.default_shipment=(shipment)
     @default_shipment = shipment
   end
@@ -19,9 +20,9 @@ class Stage # rubocop:disable Metrics/ClassLength
   end
 
   def self.json_create(hash)
-    raise "no default_shipment set" if self.class.default_shipment.nil?
+    raise 'no default_shipment set' if self.class.default_shipment.nil?
 
-    new self.default_shipment, hash['errors'], hash['warnings'], hash['data'],
+    new default_shipment, hash['errors'], hash['warnings'], hash['data'],
         hash['start'], hash['end']
   end
   
@@ -37,13 +38,12 @@ class Stage # rubocop:disable Metrics/ClassLength
     }.to_json(*args)
   end
 
-  def initialize(shipment, **args) # rubocop:disable Metrics/MethodLength
-    unless shipment.is_a? Shipment
-      raise StandardError,
-            "shipment class #{shipment.class} for #{self.class}#initialize"
+  def initialize(shipment, **args) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    unless shipment.nil? || shipment.is_a?(Shipment)
+      raise StandardError, "unknown shipment class #{shipment.class}"
     end
+
     @shipment = shipment
-    @metadata = metadata
     @name = args[:name] || self.class.to_s
     @options = {} # Hash of command-line arguments
     @errors = args[:errors] || [] # Fatal conditions, Array of Error
