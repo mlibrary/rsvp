@@ -99,7 +99,7 @@ class Preflight < Stage
 
       path = File.join(shipment_directory, barcode, entry)
       if File.directory? path
-        add_error Error.new("illegal subdirectory '#{entry}' in barcode", entry)
+        add_error Error.new("illegal barcode subdirectory '#{entry}'", barcode)
       elsif self.class::TIFF_REGEX.match? entry
         have_tiff = true
       elsif self.class.ignorable_files.include? entry
