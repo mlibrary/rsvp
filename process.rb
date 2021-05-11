@@ -52,7 +52,6 @@ unless File.exist?(dir) && File.directory?(dir)
 end
 
 begin
-  puts "Creating Processor with #{dir}"
   processor = Processor.new(dir, options)
 rescue JSON::ParserError => e
   puts "unable to parse #{File.join(dir, status.json)}: #{e}"
