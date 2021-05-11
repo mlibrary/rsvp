@@ -97,7 +97,7 @@ class Shipment
     files = []
     source_barcodes.each do |b|
       barcode_dir = File.join(@dir, 'source', b)
-      entries = Dir.entries(barcode_dir).reject { |e| %w[. ..].include? e }
+      entries = Dir.entries(barcode_dir).reject { |e| %w[. ..].include? e }.sort
       entries.each do |e|
         next unless e.end_with? type
 
@@ -125,13 +125,14 @@ class Shipment
     end
   end
 
-  def restore_from_source_directory(*barcode_list)
+  def restore_from_source_directory(*barcode_list) # rubocop:disable Metrics/AbcSize
     unless File.directory? source_directory
       raise Errno::ENOENT, "source directory #{source_directory} not found"
     end
 
     barcode_list = source_barcodes if barcode_list.size.zero?
     barcode_list.each do |barcode|
+      yield barcode if block_given?
       dest = File.join(@dir, barcode)
       FileUtils.rm_r(dest, force: true) if File.exist? dest
       FileUtils.copy_entry(File.join(source_directory, barcode), dest)

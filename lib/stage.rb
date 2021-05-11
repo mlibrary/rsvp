@@ -3,9 +3,10 @@
 
 require 'tempfile'
 require 'error'
+require 'progress_bar'
 
 # Base class for conversion stages
-class Stage # rubocop:disable Metrics/ClassLength
+class Stage
   attr_reader :data
   attr_accessor :name, :shipment
 
@@ -24,6 +25,7 @@ class Stage # rubocop:disable Metrics/ClassLength
     @errs = [] # Fatal conditions, Array of Error
     @warns = [] # Nonfatal conditions, Array of Error
     @data = {} # A data structure that is written to status.json for the stage
+    @bar = ProgressBar.new(self.class, options)
   end
 
   def run
@@ -34,6 +36,7 @@ class Stage # rubocop:disable Metrics/ClassLength
     raise "nil err passed to #{self.class}#add_error" if err.nil?
     raise "#{err.class} passed to add_error" unless err.is_a? Error
 
+    @bar.error = true
     @errs << err
   end
 
@@ -61,6 +64,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   # Expected to be run as part of #run,
   # may be called multiple times.
   def cleanup
+    @bar.done!
     cleanup_copy_on_success
     cleanup_delete_on_success
     cleanup_tempdirs
@@ -138,21 +142,5 @@ class Stage # rubocop:disable Metrics/ClassLength
 
   def image_files(type = 'tif')
     shipment.image_files(type)
-  end
-
-  # Write a single-line progress bar.
-  # The \033[K is to erase the entire line in case a previous action string
-  # might not be completely overwritten by a subsequent shorter one.
-  def write_progress(finished, total, action = '')
-    return if @options[:no_progress]
-
-    progress = 10 * finished / total
-    block = '█'.encode('utf-8')
-    bar = format '%<bar>-10s', bar: block * progress
-    bar = bar.red if @errs.count.positive?
-    printf("\r\033[K%-16s |%s| (#{finished}/#{total}) #{action}",
-           self.class, bar)
-    @progress = progress
-    puts "\n" if @progress >= 10
   end
 end

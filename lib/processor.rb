@@ -7,6 +7,7 @@ require 'pathname'
 require 'yaml'
 
 require 'error'
+require 'progress_bar'
 require 'shipment'
 require 'string_color'
 
@@ -30,8 +31,7 @@ class Processor # rubocop:disable Metrics/ClassLength
       return
     end
     if @options[:restart_all] && File.directory?(@shipment.source_directory)
-      # FIXME: this could be an expensive operation requiring a progress bar
-      @shipment.restore_from_source_directory
+      restore_from_source_directory
     end
     stages.each do |stage|
       next unless @status[:stages][stage.name.to_sym].nil? ||
@@ -42,6 +42,15 @@ class Processor # rubocop:disable Metrics/ClassLength
                @status[:stages][stage.name.to_sym][:errors].any?
     end
     query
+  end
+
+  def restore_from_source_directory
+    bar = ProgressBar.new('Processor')
+    bar.steps = @shipment.source_barcode_directories.count
+    @shipment.restore_from_source_directory do |barcode|
+      bar.next! "copying from source/#{barcode}"
+    end
+    bar.done!
   end
 
   def config
@@ -141,13 +150,17 @@ class Processor # rubocop:disable Metrics/ClassLength
   # or even a new metadata class.
   def metadata_query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     unless File.directory? @shipment.source_directory
-      return 'source directory not yet populated'
+      return 'Source directory not yet populated'
     end
 
     added = []
     removed = []
     changed = []
+    bar = ProgressBar.new 'Metadata Check'
+    bar.steps = @shipment.source_image_files.count +
+                @shipment.metadata[:checksums].keys.count
     @shipment.source_image_files.each do |image_file|
+      bar.next! "#{image_file.barcode_file} checksum"
       if @shipment.metadata[:checksums][image_file.path].nil?
         added << image_file.path
       else
@@ -158,9 +171,11 @@ class Processor # rubocop:disable Metrics/ClassLength
         end
       end
     end
-    @shipment.metadata[:checksums].keys.map(&:to_s).each do |path|
+    @shipment.metadata[:checksums].keys.sort.map(&:to_s).each do |path|
+      bar.next! "#{@shipment.barcode_file_from_path(path)} existence"
       removed << path unless File.exist? path.to_s
     end
+    bar.done!
     "Source directory changes: #{added.count} added," \
     " #{removed.count} removed, #{changed.count} changed"
   end

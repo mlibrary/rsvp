@@ -8,16 +8,16 @@ require 'tag_data'
 # The only thing that is required here is that the artist tag for 'dcu'
 # is applied to all files that don't have it.
 class Tagger < Stage
-  def run # rubocop:disable Metrics/AbcSize
+  def run
     @barcode_to_tempdir = {}
     calculate_tags
     return if errors.count.positive?
 
+    @bar.steps = image_files.count
     image_files.each_with_index do |image_file, i|
-      write_progress(i, image_files.count, image_file.barcode_file)
+      @bar.step! i, image_file.barcode_file
       tag image_file
     end
-    write_progress(image_files.count, image_files.count)
     cleanup
   end
 

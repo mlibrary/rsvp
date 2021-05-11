@@ -7,11 +7,12 @@ require 'stage'
 class PaginationCheck < Stage
   def run
     @re = /^([0-9]{8})\.(?:tif|jp2)$/
+    @bar.steps = barcode_directories.count
     barcode_directories.each_with_index do |barcode, i|
-      write_progress(i, barcode_directories.count, barcode)
+      @bar.step! i, barcode
       find_errors_in_dir(barcode)
     end
-    write_progress(barcode_directories.count, barcode_directories.count)
+    cleanup
   end
 
   private

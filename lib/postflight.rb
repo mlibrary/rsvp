@@ -13,24 +13,28 @@ class Postflight < Stage
 
   private
 
-  def process_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def process_shipment_directory # rubocop:disable Metrics/MethodLength
     real_barcodes = []
-    barcode_directories.each_with_index do |path, i|
+    @bar.steps = steps
+    barcode_directories.each do |path|
       barcode = path.split(File::SEPARATOR)[-1]
-      write_progress(i, barcode_directories.count + 2,
-                     "feed validate #{barcode}")
+      @bar.next! "validate #{barcode}"
       if File.directory? path
         process_barcode_directory(path, barcode)
         real_barcodes << barcode
       end
     end
-    write_progress(barcode_directories.count, barcode_directories.count + 2,
-                   'barcode check')
+    @bar.next! 'barcode check'
     check_barcode_lists(real_barcodes)
-    write_progress(barcode_directories.count + 1, barcode_directories.count + 2,
-                   'verify checksums')
+    @bar.next! 'verify checksums'
     verify_source_checksums
-    write_progress(barcode_directories.count + 2, barcode_directories.count + 2)
+    cleanup
+  end
+
+  def steps
+    barcode_directories.count + 1 +
+      shipment.source_image_files.count +
+      shipment.metadata[:checksums].keys.count
   end
 
   def process_barcode_directory(dir, barcode)
@@ -51,6 +55,7 @@ class Postflight < Stage
   def verify_source_checksums # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment.source_image_files.each do |image_file|
       checksum = shipment.metadata[:checksums][image_file.path]
+      @bar.next! "#{image_file.barcode_file} checksum"
       if checksum.nil?
         add_error Error.new('SHA missing', image_file.barcode, image_file.path)
       else
@@ -62,6 +67,7 @@ class Postflight < Stage
       end
     end
     shipment.metadata[:checksums].keys.map(&:to_s).each do |path|
+      @bar.next! "#{@shipment.barcode_file_from_path(path)} existence"
       unless File.exist? path
         add_error Error.new('file missing', barcode_from_path(path), path)
       end

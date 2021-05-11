@@ -27,27 +27,23 @@ class Preflight < Stage
       add_error Error.new("no barcode directories in #{shipment_directory}")
       return
     end
-    step = 0
-    steps = 2 * shipment.metadata[:initial_barcodes].count
+    @bar.steps = 2 * shipment.metadata[:initial_barcodes].count
     unless File.directory? source_directory
-      steps += shipment.metadata[:initial_barcodes].count
+      @bar.steps += shipment.metadata[:initial_barcodes].count
     end
     shipment.setup_source_directory do |barcode|
-      write_progress(step, steps, "setup source/#{barcode}")
-      step += 1
+      @bar.next! "setup source/#{barcode}"
     end
     checksum_source_directory do |barcode|
-      write_progress(step, steps, "checksum source/#{barcode}")
-      step += 1
+      @bar.next! "checksum source/#{barcode}"
     end
-    shipment.metadata[:initial_barcodes].each_with_index do |barcode, i|
+    shipment.metadata[:initial_barcodes].each do |barcode|
       unless Luhn.valid? barcode
         add_warning Error.new('Luhn checksum failed', barcode)
       end
-      write_progress(step + i, steps, "validate #{barcode}")
+      @bar.next! "validate #{barcode}"
       validate_barcode_directory barcode
     end
-    write_progress(steps, steps)
     cleanup
   end
 

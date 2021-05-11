@@ -167,7 +167,10 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     tiff = File.join(shipment.source_directory, shipment.barcodes[0],
                      '00000003.tif')
     FileUtils.touch tiff
-    mq = processor.metadata_query
+    mq = nil
+    capture_io do
+      mq = processor.metadata_query
+    end
     assert_match(/1\schanged/, mq, 'metadata_query notes changed source file')
     assert_match(/1\sadded/, mq, 'metadata_query notes added source file')
     assert_match(/1\sremoved/, mq, 'metadata_query notes removed source file')
