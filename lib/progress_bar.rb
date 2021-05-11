@@ -15,10 +15,10 @@ class ProgressBar
     @newline = false
   end
 
-  def step!(obj, action = '')
+  def step!(done, action = '')
     return if done?
 
-    @done = obj
+    @done = done
     @done = @steps if @done > @steps
     draw action
   end
@@ -41,7 +41,7 @@ class ProgressBar
     return if @options[:no_progress] || @newline
 
     progress = @steps.zero? ? 0 : 10 * @done / @steps
-    bar = format '%<bar>-10s', bar: block * progress
+    bar = format '%<bar>-10s', bar: segment * progress
     bar = bar.red if @error
     printf("\r\033[K%-16s |%s| (#{done}/#{steps}) #{action}",
            @owner, bar)
@@ -53,7 +53,7 @@ class ProgressBar
 
   private
 
-  def block
-    @block ||= '█'.encode('utf-8')
+  def segment
+    @segment ||= '█'.encode('utf-8')
   end
 end
