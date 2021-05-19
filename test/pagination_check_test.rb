@@ -27,11 +27,13 @@ class PaginationCheckTest < Minitest::Test
     assert(stage.warnings.none?, 'no warnings')
   end
 
-  def test_missing
+  def test_missing # rubocop:disable Metrics/AbcSize
     shipment = TestShipment.new(test_name, 'BC T bitonal 1-2 T bitonal 4-5')
     stage = PaginationCheck.new(shipment, @options)
     stage.run
     assert(stage.errors.count == 1, 'one missing page error')
+    assert_equal(stage.errors[0].barcode, shipment.barcodes[0],
+                 'error barcode is shipment barcode')
     assert_match(/missing/, stage.errors[0].description,
                  'error contains "missing"')
   end
