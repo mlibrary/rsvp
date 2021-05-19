@@ -7,26 +7,27 @@ require 'stage'
 class PaginationCheck < Stage
   def run
     @re = /^([0-9]{8})\.(?:tif|jp2)$/
-    @bar.steps = barcode_directories.count
-    barcode_directories.each_with_index do |barcode, i|
-      @bar.step! i, barcode
-      find_errors_in_dir(barcode)
+    @bar.steps = shipment.barcodes.count
+    shipment.barcodes.each do |barcode|
+      @bar.next! barcode
+      find_errors_in_barcode(barcode)
     end
     cleanup
   end
 
   private
 
-  def find_errors_in_dir(dir)
+  def find_errors_in_barcode(barcode)
+    dir = File.join(shipment.directory, barcode)
     pages = pages_in_dir(dir)
     missing = missing_pages(pages)
     if missing.count.positive?
-      add_error Error.new("missing pages {#{missing.join(', ')}}", dir)
+      add_error Error.new("missing pages {#{missing.join(', ')}}", barcode)
     end
     duplicate = duplicate_pages(pages)
     return unless duplicate.count.positive?
 
-    add_error Error.new("duplicate pages {#{duplicate.join(', ')}}", dir)
+    add_error Error.new("duplicate pages {#{duplicate.join(', ')}}", barcode)
   end
 
   def pages_in_dir(dir)
