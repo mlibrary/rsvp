@@ -106,7 +106,7 @@ begin
           end
         end
       else
-        puts 'Unknown command'
+        puts 'Unknown command' unless cmd.nil?
       end
     rescue StandardError => e
       puts "#{e.inspect.bold}\n  #{e.backtrace.join("\n  ")}".red
