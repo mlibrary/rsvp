@@ -79,8 +79,7 @@ begin
           processor.error_query[barcode].each do |h|
             puts h[:stage].brown
             h[:errors].each do |err|
-              puts "  #{'File'.bold}\t#{err.path}" unless err.path.nil?
-              puts "  #{'Error'.bold}\t#{err.description.italic}"
+              puts "#{(err.path || '').bold} #{err.description.italic}"
             end
           end
         end
@@ -99,9 +98,8 @@ begin
           puts (barcode.nil? ? '(General)' : barcode).bold
           processor.warning_query[barcode].each do |h|
             puts h[:stage].brown
-            h[:warnings].each do |warn|
-              puts "  #{'File'.bold}\t#{warn.path}" unless warn.path.nil?
-              puts "  #{'Error'.bold}\t#{warn.description.italic}"
+            h[:warnings].each do |err|
+              puts "#{(err.path || '').bold} #{err.description.italic}"
             end
           end
         end

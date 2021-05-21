@@ -29,5 +29,9 @@ class String
   def underline;      "\e[4m#{self}\e[24m" end
   def blink;          "\e[5m#{self}\e[25m" end
   def reverse_color;  "\e[7m#{self}\e[27m" end
+
+  def decolorize
+    gsub(/\e\[\d\d?(;\d\d?)?m/, '')
+  end
 end
 # rubocop:enable Style/SingleLineMethods, Layout/EmptyLineBetweenDefs
