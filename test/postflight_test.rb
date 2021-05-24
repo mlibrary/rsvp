@@ -4,7 +4,7 @@
 require 'minitest/autorun'
 require 'postflight'
 
-class PostflightTest < Minitest::Test
+class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @options = { no_progress: true }
     @options[:config] = { feed_validate_script:
@@ -53,16 +53,38 @@ class PostflightTest < Minitest::Test
            'stage gripes about added barcode'
   end
 
-  def test_feed_validate_error
-    ENV['FAKE_FEED_VALIDATE_FAIL'] = '1'
+  def test_feed_validate_error # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
     stage = Preflight.new(shipment, @options)
     stage.run
+    ENV['FAKE_FEED_VALIDATE_FAIL'] = File.join(shipment.barcodes[0],
+                                               '00000001.tif')
     stage = Postflight.new(shipment, @options)
     stage.run
-    assert stage.errors.any? { |e| /something\swent\swrong/i.match? e.to_s },
+    assert stage.errors.any? { |e| /missing field value/i.match? e.to_s },
            'error(s) from feed validate'
+    assert stage.warnings.any? { |e| /validation failed/i.match? e.to_s },
+           'warning(s) from feed validate'
+    assert stage.errors.none? { |e| /failure!/i.match? e.to_s },
+           'no "failure!" error from feed validate'
     ENV.delete 'FAKE_FEED_VALIDATE_FAIL'
+  end
+
+  def test_new_feed_validate_error # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
+    stage = Preflight.new(shipment, @options)
+    stage.run
+    ENV['FAKE_NEW_FEED_VALIDATE_FAIL'] = File.join(shipment.barcodes[0],
+                                                   '00000001.tif')
+    stage = Postflight.new(shipment, @options)
+    stage.run
+    assert stage.errors.any? { |e| /missing field value/i.match? e.to_s },
+           'error(s) from feed validate'
+    assert stage.warnings.any? { |e| /validation failed/i.match? e.to_s },
+           'warning(s) from feed validate'
+    assert stage.errors.none? { |e| /failure!/i.match? e.to_s },
+           'no "failure!" error from feed validate'
+    ENV.delete 'FAKE_NEW_FEED_VALIDATE_FAIL'
   end
 
   def test_feed_validate_crash
@@ -72,7 +94,7 @@ class PostflightTest < Minitest::Test
     stage.run
     stage = Postflight.new(shipment, @options)
     stage.run
-    assert(stage.errors.any? { |e| /returned\s1/i.match? e.to_s },
+    assert(stage.errors.any? { |e| /returned 1/i.match? e.to_s },
            'nonzero feed validate exit status')
     ENV.delete 'FAKE_FEED_VALIDATE_CRASH'
   end
@@ -86,7 +108,7 @@ class PostflightTest < Minitest::Test
     `echo 'test' > #{file}`
     stage = Postflight.new(shipment, @options)
     stage.run
-    assert stage.errors.any? { |e| /SHA\smismatch/i.match? e.to_s },
+    assert stage.errors.any? { |e| /SHA mismatch/i.match? e.to_s },
            'checksum error generated'
   end
 
@@ -99,7 +121,7 @@ class PostflightTest < Minitest::Test
     FileUtils.rm file
     stage = Postflight.new(shipment, @options)
     stage.run
-    assert stage.errors.any? { |e| /file\smissing/i.match? e.to_s },
+    assert stage.errors.any? { |e| /file missing/i.match? e.to_s },
            'file missing error generated'
   end
 
@@ -112,7 +134,7 @@ class PostflightTest < Minitest::Test
     `echo 'test' > #{file}`
     stage = Postflight.new(shipment, @options)
     stage.run
-    assert stage.errors.any? { |e| /SHA\smissing/i.match? e.to_s },
+    assert stage.errors.any? { |e| /SHA missing/i.match? e.to_s },
            'SHA missing error generated'
   end
 end

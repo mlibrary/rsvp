@@ -2,34 +2,26 @@
 # frozen_string_literal: true
 
 require 'digest'
+require 'open3'
 require 'set'
 require 'stage'
 
 # Image Metadata Validation Stage
 class Postflight < Stage
   def run
-    process_shipment_directory
-  end
-
-  private
-
-  def process_shipment_directory # rubocop:disable Metrics/MethodLength
-    real_barcodes = []
     @bar.steps = steps
-    barcode_directories.each do |path|
-      barcode = path.split(File::SEPARATOR)[-1]
-      @bar.next! "validate #{barcode}"
-      if File.directory? path
-        process_barcode_directory(path, barcode)
-        real_barcodes << barcode
-      end
+    shipment.barcodes.each do |b|
+      @bar.next! "validate #{b}"
+      run_feed_validate_script(b)
     end
     @bar.next! 'barcode check'
-    check_barcode_lists(real_barcodes)
+    check_barcode_lists
     @bar.next! 'verify checksums'
     verify_source_checksums
     cleanup
   end
+
+  private
 
   def steps
     barcode_directories.count + 1 +
@@ -37,17 +29,9 @@ class Postflight < Stage
       shipment.metadata[:checksums].keys.count
   end
 
-  def process_barcode_directory(dir, barcode)
-    script = @options[:config][:feed_validate_script]
-    cmd = "perl #{script} google mdp #{dir} #{barcode}"
-    log "running '#{cmd}'"
-    err = run_command(cmd)
-    add_error Error.new(err, barcode) unless err.nil?
-  end
-
-  def check_barcode_lists(barcodes)
+  def check_barcode_lists # rubocop:disable Metrics/AbcSize
     s1 = Set.new shipment.metadata[:initial_barcodes]
-    s2 = Set.new barcodes
+    s2 = Set.new shipment.barcodes
     add_error Error.new("barcodes removed: #{s1 - s2}") if (s1 - s2).any?
     add_error Error.new("barcodes added: #{s2 - s1}") if (s2 - s1).any?
   end
@@ -74,20 +58,64 @@ class Postflight < Stage
     end
   end
 
-  def run_command(cmd) # rubocop:disable Metrics/MethodLength
-    stdout_str, stderr_str, code = Open3.capture3(cmd)
-    if code.exitstatus != 0
-      return "'#{cmd}' returned #{code.exitstatus}: #{stderr_str}"
-    end
-    return unless stdout_str.chomp.length.positive?
+  def feed_validate_script(barcode)
+    script = @options[:config][:feed_validate_script]
+    dir = File.join(shipment.directory, barcode)
+    "perl #{script} google mdp #{dir} #{barcode}"
+  end
 
-    err_lines = stdout_str.chomp.split("\n")
+  def run_feed_validate_script(barcode)
+    cmd = feed_validate_script barcode
+    log "running '#{cmd}'"
+    stdout_str, stderr_str, code = Open3.capture3(cmd)
+    if code.exitstatus.zero?
+      process_feed_validate_output(barcode, stdout_str)
+    else
+      msg = "'#{cmd}' returned #{code.exitstatus}: #{stderr_str}"
+      add_error Error.new(msg, barcode)
+    end
+  end
+
+  def process_feed_validate_output(barcode, output)
+    return if output.chomp.length.zero?
+
+    err_lines = output.chomp.split("\n")
     err_lines.each do |line|
-      next if line == 'failure!' && errors.any?
+      next if line == 'failure!' && err_lines.count > 1
       next if line == 'success!'
 
-      return line
+      process_feed_validate_line barcode, line
     end
-    nil
+  end
+
+  def process_feed_validate_line(barcode, line)
+    # Remove ANSI color and leading runtime info and pid
+    line = line.decolorize.sub(/.+?(?=(ERROR|WARN))/, '')
+    fields = line.split("\t")
+    # Extract file if possible, nil if no match
+    file = line[/\tfile: (.*?)(\t|$)/, 1]
+    file = File.join(barcode, file) unless file.nil?
+    # Remove fields starting with "objid: ", "namespace: ", "remediable: ",
+    # "stage: ", and "file: "
+    re = /^(objid|namespace|remediable|stage|file): /
+    fields = fields.delete_if { |f| re.match? f }
+    desc = fields.join ', '
+    # Compact "Invalid value for field, field:" errors
+    desc = desc.gsub(/Invalid value for field, field:/i,
+                     'invalid value for field')
+    add_feed_validate_error(desc, barcode, file)
+  end
+
+  def add_feed_validate_error(desc, barcode, file)
+    if /^warn - /i.match? desc
+      desc = desc.gsub(/^warn - /i, '')
+      add_warning Error.new(desc, barcode, file)
+    else
+      desc = desc.gsub(/^error - /i, '')
+      unless /file validation failed/i.match?(desc) && !file.nil? &&
+             errors.any? { |e| e.barcode == barcode && e.path == file }
+        add_error Error.new(desc, barcode, file)
+      end
+    end
   end
 end
