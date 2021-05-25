@@ -2,30 +2,31 @@
 # frozen_string_literal: true
 
 require 'tempfile'
+
+require 'config'
 require 'error'
 require 'progress_bar'
 
 # Base class for conversion stages
 class Stage
-  attr_reader :data
+  attr_reader :data, :config
   attr_accessor :name, :shipment
 
-  def initialize(shipment, options = {}) # rubocop:disable Metrics/MethodLength
+  def initialize(shipment, config = nil) # rubocop:disable Metrics/MethodLength
     unless shipment.is_a? Shipment
       raise StandardError,
             "shipment class #{shipment.class} for #{self.class}#initialize"
     end
-    raise "nil options passed to #{self.class}#initialize" if options.nil?
 
     @name = self.class.to_s
+    @config = config || Config.new
     @shipment = shipment
-    @options = options # Hash of command-line arguments
     # FIXME: change this back to @errors when tests are passing,
     # maybe restore attr_reader
     @errs = [] # Fatal conditions, Array of Error
     @warns = [] # Nonfatal conditions, Array of Error
     @data = {} # A data structure that is written to status.json for the stage
-    @bar = ProgressBar.new(self.class, options)
+    @bar = ProgressBar.new(self.class, config)
   end
 
   def run
@@ -58,7 +59,7 @@ class Stage
   # OK to make destructive changes to the shipment
   # FIXME: rename make_changes_to_barcode?
   def make_changes?
-    @errs.none? && !@options[:noop]
+    @errs.none? && !config[:noop]
   end
 
   # Expected to be run as part of #run,
@@ -75,11 +76,7 @@ class Stage
 
     while @copy_on_success.any?
       pair = @copy_on_success.pop
-      if make_changes?
-        FileUtils.cp pair[0], pair[1]
-      else
-        FileUtils.rm pair[0]
-      end
+      FileUtils.cp pair[0], pair[1] if make_changes?
     end
   end
 
@@ -107,7 +104,7 @@ class Stage
   end
 
   # source is copied to destination on success,
-  # deleted on failure or if noop option flag is set.
+  # left alone on failure or if noop option flag is set.
   def copy_on_success(source, destination)
     (@copy_on_success ||= []) << [source, destination]
   end

@@ -63,9 +63,9 @@ class Shipment
 
   def source_barcodes
     bars = Dir.entries(source_directory).reject do |b|
-      %w[. .. .DS_Store source tmp].include? b
+      %w[. ..].include? b
     end
-    bars.select { |b| File.directory?(File.join(@dir, b)) }.sort
+    bars.select { |b| File.directory?(File.join(@dir, 'source', b)) }.sort
   end
 
   # FIXME: these may not be used any more

@@ -11,7 +11,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
 
   def test_new
     shipment = TestShipment.new(test_name)
-    processor = Processor.new(shipment.directory, {})
+    processor = Processor.new(shipment.directory)
     refute_nil processor, 'processor successfully created'
     refute_nil processor.status, 'processor status exists'
     refute File.exist?(File.join(shipment.directory, 'status.json')),
@@ -81,7 +81,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def test_discard_failure
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory, {})
+    processor = Processor.new(shipment.directory)
     capture_io do
       processor.run
     end
@@ -94,7 +94,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def test_reload_status_file # rubocop:disable Metrics/MethodLength
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory, {})
+    processor = Processor.new(shipment.directory)
     capture_io do
       processor.run
     end
