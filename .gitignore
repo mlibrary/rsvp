@@ -38,4 +38,4 @@
 .DS_Store
 /bin
 coverage
-
+/config/*.local.yml

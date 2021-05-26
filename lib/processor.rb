@@ -6,31 +6,32 @@ require 'json'
 require 'pathname'
 require 'yaml'
 
+require 'config'
 require 'error'
 require 'progress_bar'
 require 'shipment'
 require 'string_color'
+require 'symbolize'
 
 # Processor
 class Processor # rubocop:disable Metrics/ClassLength
-  attr_reader :dir, :options, :status, :shipment
+  attr_reader :dir, :config, :status, :shipment
 
   def initialize(dir, options = {})
     @shipment = Shipment.new(dir)
-    @options = options
-    @options[:config] = config
+    @config = Config.new(options)
     @status = { stages: {} }
     init_status_file
   end
 
   def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     # Bail out with a message if any previous stage had an error.
-    discard_failure if @options[:reset]
+    discard_failure if config[:reset]
     if had_previous_error?
       puts 'Stage failed on previous run, aborting'.red
       return
     end
-    if @options[:restart_all] && File.directory?(@shipment.source_directory)
+    if config[:restart_all] && File.directory?(@shipment.source_directory)
       restore_from_source_directory
     end
     stages.each do |stage|
@@ -38,7 +39,7 @@ class Processor # rubocop:disable Metrics/ClassLength
                   @status[:stages][stage.name.to_sym][:end].nil?
 
       run_stage stage
-      break if @options[:one_stage] ||
+      break if config[:one_stage] ||
                @status[:stages][stage.name.to_sym][:errors].any?
     end
     query
@@ -53,38 +54,14 @@ class Processor # rubocop:disable Metrics/ClassLength
     bar.done!
   end
 
-  def config
-    return @config unless @config.nil?
-    raise "can't locate config file #{yaml}" unless File.exist? config_file_path
-
-    @config = symbolize YAML.load_file config_file_path
-    if File.exist? local_config_file_path
-      @config.merge! symbolize(YAML.load_file(local_config_file_path) || {})
-    end
-    @config
-  end
-
-  def config_dir
-    @config_dir ||= @options[:config_dir] ||
-                    File.expand_path('../config', __dir__)
-  end
-
-  def config_file_path
-    @config_file_path ||= File.join(config_dir, 'config.yml')
-  end
-
-  def local_config_file_path
-    @local_config_file_path ||= File.join(config_dir, 'config.local.yml')
-  end
-
   def stages
     return @stages unless @stages.nil?
 
     @stages = []
-    config[:stages].each do |s|
+    @config[:stages].each do |s|
       require s[:file]
       stage_class = Object.const_get(s[:class])
-      stage = stage_class.new(@shipment, @options)
+      stage = stage_class.new(@shipment, config)
       stage.name = s[:name]
       @stages << stage
     end
@@ -185,7 +162,7 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def write_status
-    puts "Writing status file #{status_file}" if @options[:verbose]
+    puts "Writing status file #{status_file}" if config[:verbose]
     File.open(status_file, 'w') do |f|
       f.write JSON.pretty_generate(shipment: @shipment,
                                    stages: @status[:stages])
@@ -238,13 +215,13 @@ class Processor # rubocop:disable Metrics/ClassLength
   def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/PerceivedComplexity
     return unless File.exist? status_file
 
-    if @options[:restart_all]
+    if config[:restart_all]
       File.unlink status_file
     else
       # In order to reconstitute Error objects we need to use JSON.load
       # instead of JSON.parse. So we explicitly symbolize the output.
       # rubocop:disable Security/JSONLoad
-      @status = symbolize JSON.load File.new(status_file)
+      @status = Symbolize.symbolize JSON.load File.new(status_file)
       # rubocop:enable Security/JSONLoad
       raise JSON::ParserError, "unable to parse #{status_file}" if @status.nil?
 
@@ -263,21 +240,6 @@ class Processor # rubocop:disable Metrics/ClassLength
 
   # Verbose printing of progress information
   def print_progress(str)
-    puts str if @options[:verbose]
-  end
-
-  # Based on https://gist.github.com/Integralist/9503099
-  def symbolize(obj) # rubocop:disable Metrics/MethodLength
-    case obj
-    when Hash
-      return obj.each_with_object({}) do |(k, v), memo|
-        memo.tap { |m| m[k.to_sym] = symbolize(v) }
-      end
-    when Array
-      return obj.each_with_object([]) do |v, memo|
-        memo << symbolize(v)
-      end
-    end
-    obj
+    puts str if config[:verbose]
   end
 end

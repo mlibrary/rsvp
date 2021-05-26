@@ -15,6 +15,11 @@ stages:
   - name: Compressor
     class: Compressor
     file: compressor
+  - name: DLXSCompressor
+    class: DLXSCompressor
+    file: dlxs_compressor
   - name: Postflight
     class: Postflight
     file: postflight
+
+

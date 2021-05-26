@@ -25,14 +25,14 @@ class Tagger < Stage
   private
 
   def calculate_tags # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    artist = @options[:tagger_artist] || 'dcu'
+    artist = config[:tagger_artist] || 'dcu'
     @artist_tag ||= if TagData::ARTIST[artist].nil?
                       add_warning Error.new("using custom artist '#{artist}'")
                       artist
                     else
                       TagData::ARTIST[artist]
                     end
-    scanner = @options[:tagger_scanner]
+    scanner = config[:tagger_scanner]
     unless scanner.nil?
       if TagData::SCANNER[scanner].nil?
         unless /\|/.match? scanner
@@ -46,7 +46,7 @@ class Tagger < Stage
         @make_tag, @model_tag = TagData::SCANNER[scanner]
       end
     end
-    software = @options[:tagger_software]
+    software = config[:tagger_software]
     return if software.nil?
 
     if TagData::SOFTWARE[software].nil?

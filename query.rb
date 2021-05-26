@@ -10,19 +10,38 @@ $LOAD_PATH << File.join(APP_ROOT, 'lib')
 require 'string_color'
 require 'processor'
 
+options_data = [['-c', '--config-profile PROFILE', :config_profile,
+                 'Configuration PROFILE (e.g., "dlxs")'],
+                ['-d', '--config-dir DIRECTORY', :config_dir,
+                 'Configuration directory DIRECTORY'],
+                ['-n', '--noop', :noop,
+                 'No-op, make no changes to the filesystem'],
+                ['-r', '--reset', :reset,
+                 'Reset and try last failed stage'],
+                ['-v', '--verbose', :verbose,
+                 'Run verbosely'],
+                ['-1', '--one-stage', :one_stage,
+                 'Run one stage and then stop'],
+                [:OPTIONAL, '--tagger-scanner SCANNER', :tagger_scanner,
+                 'Set scanner tag to SCANNER'],
+                [:OPTIONAL, '--tagger-software SOFTWARE', :tagger_software,
+                 'Set scan software tag to SOFTWARE'],
+                [:OPTIONAL, '--tagger-artist ARTIST', :tagger_artist,
+                 'Set artist tag to ARTIST']].freeze
 options = {}
-OptionParser.new do |opts|
-  opts.banner = "Usage: #{$PROGRAM_NAME} [options] DIR [DIR...]"
-
-  opts.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
-    options[:verbose] = v
+opts = OptionParser.new
+opts.banner = "Usage: #{$PROGRAM_NAME} [options] DIR"
+options_data.each do |vals|
+  opts.on(vals[0], vals[1], vals[3]) do |v|
+    options[vals[2]] = v
   end
+end
+opts.parse!
 
-  if ARGV.empty? || ARGV.count > 1
-    puts opts.help
-    exit 1
-  end
-end.parse!
+if ARGV.count != 1
+  puts opts.help
+  exit 1
+end
 
 dir = Pathname.new(ARGV[0]).cleanpath.to_s
 unless File.exist?(dir) && File.directory?(dir)

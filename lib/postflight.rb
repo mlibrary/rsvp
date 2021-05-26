@@ -59,7 +59,7 @@ class Postflight < Stage
   end
 
   def feed_validate_script(barcode)
-    script = @options[:config][:feed_validate_script]
+    script = config[:feed_validate_script]
     dir = File.join(shipment.directory, barcode)
     "perl #{script} google mdp #{dir} #{barcode}"
   end

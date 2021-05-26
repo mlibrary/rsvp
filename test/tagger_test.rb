@@ -6,7 +6,7 @@ require 'tagger'
 
 class TaggerTest < Minitest::Test
   def setup
-    @options = { no_progress: true }
+    @config = Config.new({ no_progress: true })
   end
 
   def teardown
@@ -15,13 +15,13 @@ class TaggerTest < Minitest::Test
 
   def test_new
     shipment = TestShipment.new(test_name)
-    stage = Tagger.new(shipment, @options)
+    stage = Tagger.new(shipment, @config)
     refute_nil stage, 'stage successfully created'
   end
 
   def test_default_tags # rubocop:disable Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 BC T bitonal 1')
-    stage = Tagger.new(shipment, @options)
+    stage = Tagger.new(shipment, @config)
     stage.run
     shipment.image_files.each do |image_file|
       info = `tiffinfo #{image_file.path}`
@@ -38,8 +38,8 @@ class TaggerTest < Minitest::Test
     spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    options = { no_progress: true, tagger_artist: 'bentley' }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true, tagger_artist: 'bentley' })
+    stage = Tagger.new(shipment, config)
     stage.run
     info = `tiffinfo #{tiff}`
     assert_match(/bentley/i, info, 'tiffinfo has Bentley artist tag')
@@ -49,8 +49,8 @@ class TaggerTest < Minitest::Test
     spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    options = { no_progress: true, tagger_scanner: 'copibookv' }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true, tagger_scanner: 'copibookv' })
+    stage = Tagger.new(shipment, config)
     stage.run
     info = `tiffinfo #{tiff}`
     assert_match('Make: i2S DigiBook', info,
@@ -62,8 +62,8 @@ class TaggerTest < Minitest::Test
     spec = 'BC T bitonal 1'
     shipment = TestShipment.new(test_name, spec)
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    options = { no_progress: true, tagger_software: 'limb' }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true, tagger_software: 'limb' })
+    stage = Tagger.new(shipment, config)
     stage.run
     info = `tiffinfo #{tiff}`
     assert_match('LIMB', info, 'tiffinfo has LIMB software tag')
@@ -72,7 +72,7 @@ end
 
 class TaggerCustomTagTest < Minitest::Test
   def setup
-    @options = { no_progress: true }
+    @config = Config.new({ no_progress: true })
   end
 
   def teardown
@@ -82,8 +82,8 @@ class TaggerCustomTagTest < Minitest::Test
   def test_custom_artist_tag # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     artist = 'University of Michigan: Secret Vaults'
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
-    options = { no_progress: true, tagger_artist: artist }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true, tagger_artist: artist })
+    stage = Tagger.new(shipment, config)
     stage.run
     assert(stage.errors.count.zero?, 'no errors generated')
     assert stage.warnings.any? { |e| /custom\sartist/i.match? e.to_s },
@@ -95,8 +95,9 @@ class TaggerCustomTagTest < Minitest::Test
 
   def test_custom_scanner_tag # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
-    options = { no_progress: true, tagger_scanner: 'Scans-R-Us|F-150 Flatbed' }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true,
+                          tagger_scanner: 'Scans-R-Us|F-150 Flatbed' })
+    stage = Tagger.new(shipment, config)
     stage.run
     assert(stage.errors.count.zero?, 'no errors generated')
     assert stage.warnings.any? { |e| /custom\sscanner/i.match? e.to_s },
@@ -111,8 +112,9 @@ class TaggerCustomTagTest < Minitest::Test
 
   def test_bogus_custom_scanner_tag
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
-    options = { no_progress: true, tagger_scanner: 'some random string' }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true,
+                          tagger_scanner: 'some random string' })
+    stage = Tagger.new(shipment, config)
     stage.run
     assert(stage.errors.any? { |e| /make\|model/i.match? e.to_s },
            'generates pipe-delimited error')
@@ -121,8 +123,8 @@ class TaggerCustomTagTest < Minitest::Test
   def test_custom_software_tag # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     software = 'WhizzySoft ScanR v33'
     shipment = TestShipment.new(test_name, 'BC T bitonal 1')
-    options = { no_progress: true, tagger_software: software }
-    stage = Tagger.new(shipment, options)
+    config = Config.new({ no_progress: true, tagger_software: software })
+    stage = Tagger.new(shipment, config)
     stage.run
     assert(stage.errors.count.zero?, 'no errors generated')
     assert stage.warnings.any? { |e| /custom\ssoftware/i.match? e.to_s },
