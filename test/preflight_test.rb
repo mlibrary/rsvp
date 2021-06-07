@@ -15,25 +15,25 @@ class PreflightTest < Minitest::Test
 
   def test_new
     shipment = TestShipment.new(test_name)
-    stage = Preflight.new(shipment, @config)
+    stage = Preflight.new(shipment, config: @config)
     refute_nil stage, 'stage successfully created'
   end
 
   def test_run
     shipment = TestShipment.new(test_name, 'BC T bitonal 1 BC T bitonal 1')
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert_equal 0, stage.errors.count, 'stage runs without errors'
     assert_equal 2, shipment.metadata[:initial_barcodes].count,
                  'correct number of initial barcodes in metadata'
-    assert_equal 2, shipment.metadata[:checksums].count,
+    assert_equal 2, shipment.checksums.count,
                  'correct number of checksums in metadata'
   end
 
   def test_luhn
     shipment = TestShipment.new(test_name, 'BBC')
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert_equal(1, stage.errors.count, 'stage runs with error')
     assert stage.warnings.any? { |e| /Luhn/.match? e.to_s },
            'stage warns about Luhn check'
@@ -44,8 +44,8 @@ class PreflightTest < Minitest::Test
     ds_store = File.join(shipment.directory, shipment.barcodes[0], '.DS_Store')
     FileUtils.touch(ds_store)
     assert(File.exist?(ds_store), '.DS_Store file created')
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert stage.warnings.any? { |e| /\.DS_Store/.match? e.to_s },
            'stage warns about removed .DS_Store'
     refute File.exist?(ds_store), '.DS_Store file removed'
@@ -56,8 +56,8 @@ class PreflightTest < Minitest::Test
     thumbs = File.join(shipment.directory, shipment.barcodes[0], 'Thumbs.db')
     FileUtils.touch(thumbs)
     assert File.exist?(thumbs), 'Thumbs.db file created'
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert stage.warnings.any? { |e| /Thumbs\.db/i.match? e.to_s },
            'stage warns about removed .DS_Store'
     refute(File.exist?(thumbs), 'Thumbs.db file removed')
@@ -68,8 +68,8 @@ class PreflightTest < Minitest::Test
     ds_store = File.join(shipment.directory, '.DS_Store')
     FileUtils.touch(ds_store)
     assert File.exist?(ds_store), '.DS_Store file created'
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert stage.warnings.any? { |e| /\.DS_Store/.match? e.to_s },
            'stage warns about removed .DS_Store'
     refute(File.exist?(ds_store), '.DS_Store file removed')
@@ -80,8 +80,8 @@ class PreflightTest < Minitest::Test
     thumbs = File.join(shipment.directory, 'Thumbs.db')
     FileUtils.touch(thumbs)
     assert File.exist?(thumbs), 'Thumbs.db file created'
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert stage.warnings.any? { |e| /Thumbs\.db/i.match? e.to_s },
            'stage warns about removed .DS_Store'
     refute File.exist?(thumbs), 'Thumbs.db file removed'
@@ -93,8 +93,8 @@ class PreflightTest < Minitest::Test
                              'checksum.md5')
     FileUtils.touch(checksum_md5)
     Dir.mkdir(File.join(shipment.directory, shipment.barcodes[0], 'spurious_d'))
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert stage.errors.any? { |e| /spurious_file/.match? e.to_s },
            'stage fails with unknown file'
     assert stage.errors.any? { |e| /spurious_d/.match? e.to_s },
@@ -105,8 +105,8 @@ class PreflightTest < Minitest::Test
 
   def test_shipment_directory_errors
     shipment = TestShipment.new(test_name, 'F spurious_file')
-    stage = Preflight.new(shipment, @config)
-    stage.run
+    stage = Preflight.new(shipment, config: @config)
+    stage.run!
     assert stage.errors.any? { |e| /no\sbarcode\sdirectories/.match? e.to_s },
            'stage fails with no barcode directories'
     assert stage.errors.any? { |e| /spurious_file/.match? e.to_s },

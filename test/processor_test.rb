@@ -3,8 +3,13 @@
 
 require 'minitest/autorun'
 require 'processor'
+require 'fixtures'
 
-class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+class ProcessorTest < Minitest::Test
+  def setup
+    @options = { config_dir: File.join(TEST_ROOT, 'config') }
+  end
+
   def teardown
     TestShipment.remove_test_shipments
   end
@@ -13,7 +18,6 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     shipment = TestShipment.new(test_name)
     processor = Processor.new(shipment.directory)
     refute_nil processor, 'processor successfully created'
-    refute_nil processor.status, 'processor status exists'
     refute File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json not created yet'
     processor.write_status
@@ -23,14 +27,13 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
 
   def test_config
     shipment = TestShipment.new(test_name)
-    options = { config_dir: File.join(TEST_ROOT, 'config') }
-    processor = Processor.new(shipment.directory, options)
+    processor = Processor.new(shipment.directory, @options)
     refute_nil processor, 'processor successfully created'
     assert_match(/fake_feed_validate/, processor.config[:feed_validate_script],
                  'has custom feed validate path')
   end
 
-  def test_unlink_status_on_reset
+  def test_unlink_status_on_restart
     shipment = TestShipment.new(test_name)
     status_json = File.join(shipment.directory, 'status.json')
     FileUtils.touch(status_json)
@@ -43,6 +46,8 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     shipment = TestShipment.new(test_name)
     processor = Processor.new(shipment.directory)
     assert_kind_of Array, processor.stages, 'processor#stages is Array'
+    assert_kind_of Stage, processor.stages[0],
+                   'processor#stages is Array of Stage'
   end
 
   def test_query
@@ -58,15 +63,11 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     capture_io do
       processor.run
     end
-    assert_kind_of Hash, processor.status
-    refute_nil processor.status[:stages]
-    stage = processor.status[:stages][:Preflight]
-    refute_nil stage
-    refute_nil stage[:start]
-    refute_nil stage[:end]
-    assert stage[:errors].any? { |e| /no.TIFF/i.match? e.to_s },
+    errs = processor.errors['Preflight'][shipment.barcodes[0]]
+    warnings = processor.warnings['Preflight'][shipment.barcodes[0]]
+    assert errs.any? { |e| /no.TIFF/i.match? e.to_s },
            'Preflight fails with no TIFFs error'
-    assert stage[:warnings].any? { |e| /\.DS_Store/.match? e.to_s },
+    assert warnings.any? { |e| /\.DS_Store/.match? e.to_s },
            'Preflight warns about .DS_Store'
   end
 
@@ -78,20 +79,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     assert_equal(File.size(status_json), 0, 'status.json is unmodified')
   end
 
-  def test_discard_failure
-    spec = 'BC T bad_16bps 1'
-    shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory)
-    capture_io do
-      processor.run
-    end
-    keys_before = processor.status[:stages].keys.count
-    processor.send :discard_failure
-    keys_after = processor.status[:stages].keys.count
-    assert(keys_after < keys_before, 'discard_failure removes failing stage')
-  end
-
-  def test_reload_status_file # rubocop:disable Metrics/MethodLength
+  def test_reload_status_file
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
     processor = Processor.new(shipment.directory)
@@ -100,79 +88,60 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     end
     processor.write_status
     processor = Processor.new(shipment.directory, {})
-    tiff_validator_status = processor.status[:stages][:'TIFF Validator']
-    assert_kind_of Error, tiff_validator_status[:errors][0],
-                   'Error class reconstituted from status.json'
+    errs = processor.errors['TIFF Validator'][shipment.barcodes[0]]
+    assert_kind_of Error, errs[0], 'Error class reconstituted from status.json'
   end
 
-  def test_abort_on_error
-    spec = 'BC T bad_16bps 1'
-    shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory, {})
+  def test_restore_from_source_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_shipment = TestShipment.new(test_name, 'BC T contone 1')
+    processor = Processor.new(test_shipment.directory, {})
+    shipment = processor.shipment
     capture_io do
       processor.run
     end
-    assert_output(/aborting/i) do
-      processor.run
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
+    # TIFF has been converted into JP2
+    refute File.exist?(tiff), '00000001.tif no longer exists'
+    capture_io do
+      processor.restore_from_source_directory
     end
+    assert File.exist?(tiff), '00000001.tif restored from source'
+  end
+end
+
+class ProcessorErrorCorrectionTest < Minitest::Test
+  def setup
+    @options = { config_dir: File.join(TEST_ROOT, 'config') }
   end
 
-  def test_error_query
-    spec = 'BC T bad_16bps 1'
-    shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory, {})
+  def teardown
+    TestShipment.remove_test_shipments
+  end
+
+  # Initial run detects bogus file, replacement allows second run to pass,
+  # and fixity is updated with the new file.
+  def test_error_correction # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    spec = 'BC T contone 1 BC T bad_16bps 1'
+    test_shipment = TestShipment.new(test_name, spec)
+    processor = Processor.new(test_shipment.directory, @options)
+    shipment = processor.shipment
     capture_io do
       processor.run
     end
-    eq = processor.error_query
-    assert eq.is_a?(Hash), 'error_query returns a Hash'
-    assert eq.key?(shipment.barcodes[0]), 'error_query has barcode key'
-  end
-
-  def test_warning_query # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    spec = 'BC T contone 1'
-    shipment = TestShipment.new(test_name, spec)
-    ds_store = File.join(shipment.directory, shipment.barcodes[0], '.DS_Store')
-    FileUtils.touch(ds_store)
-    processor = Processor.new(shipment.directory, {})
-    capture_io do
-      processor.run
-    end
-    wq = processor.warning_query
-    assert wq.is_a?(Hash), 'warning_query returns a Hash'
-    assert wq.key?(shipment.barcodes[0]), 'warning_query has barcode key'
-  end
-
-  def test_metadata_query_no_source
-    spec = 'BC T contone 1'
-    shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory, {})
-    assert_match(/not\syet\spopulated/, processor.metadata_query,
-                 'metadata_query indicates no source directory')
-  end
-
-  def test_metadata_query # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    spec = 'BC T contone 1-2'
-    shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(shipment.directory, {})
-    capture_io do
-      processor.run
-    end
-    tiff = File.join(shipment.source_directory, shipment.barcodes[0],
+    refute processor.errors.none?, 'error detected'
+    bad_barcode = test_shipment.ordered_barcodes[1]
+    tiff = File.join(bad_barcode, '00000001.tif')
+    old_checksum = shipment.checksums[tiff]
+    fixture = Fixtures.tiff_fixture('contone')
+    dest = File.join(shipment.source_barcode_directory(bad_barcode),
                      '00000001.tif')
-    `echo 'test' >> #{tiff}`
-    tiff = File.join(shipment.source_directory, shipment.barcodes[0],
-                     '00000002.tif')
-    FileUtils.rm tiff
-    tiff = File.join(shipment.source_directory, shipment.barcodes[0],
-                     '00000003.tif')
-    FileUtils.touch tiff
-    mq = nil
+    FileUtils.cp fixture, dest
     capture_io do
-      mq = processor.metadata_query
+      processor.run
     end
-    assert_match(/1\schanged/, mq, 'metadata_query notes changed source file')
-    assert_match(/1\sadded/, mq, 'metadata_query notes added source file')
-    assert_match(/1\sremoved/, mq, 'metadata_query notes removed source file')
+    new_checksum = shipment.checksums[tiff]
+    refute_nil new_checksum, 'bad file has a checksum'
+    refute_equal new_checksum, old_checksum,
+                 'old and new checksums should not match'
   end
 end

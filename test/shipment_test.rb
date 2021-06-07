@@ -112,7 +112,7 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     `/bin/echo -n 'test' > #{tiff0}`
     tiff1 = File.join(shipment.directory, shipment.barcodes[1], '00000001.tif')
     `/bin/echo -n 'test' > #{tiff1}`
-    shipment.restore_from_source_directory shipment.barcodes[0]
+    shipment.restore_from_source_directory [shipment.barcodes[0]]
     assert_equal tiff0_size, File.size(tiff0),
                  'TIFF file in restored directory at original size'
     assert_equal 4, File.size(tiff1),
@@ -125,5 +125,33 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     assert_raises(Errno::ENOENT, 'raises Errno::ENOENT') do
       shipment.restore_from_source_directory
     end
+  end
+
+  def test_fixity_check # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_shipment = TestShipment.new(test_name, 'BC T contone 2-3')
+    shipment = Shipment.new(test_shipment.directory)
+    shipment.setup_source_directory
+    shipment.checksum_source_directory
+    # Add 00000001.tif, change 00000002.tif, and remove 00000003.tif
+    tiff1 = File.join(shipment.source_directory, shipment.barcodes[0],
+                      '00000001.tif')
+    refute File.exist?(tiff1), '(make sure 00000001.tif does not exist)'
+    `/bin/echo -n 'test' > #{tiff1}`
+    tiff2 = File.join(shipment.source_directory, shipment.barcodes[0],
+                      '00000002.tif')
+    `/bin/echo -n 'test' > #{tiff2}`
+    tiff3 = File.join(shipment.source_directory, shipment.barcodes[0],
+                      '00000003.tif')
+    FileUtils.rm tiff3
+    fixity = shipment.fixity_check
+    assert_equal 1, fixity[:added].count, 'one file added'
+    assert_equal File.join(shipment.barcodes[0], '00000001.tif'),
+                 fixity[:added][0].barcode_file, '00000001.tif added'
+    assert_equal 1, fixity[:changed].count, 'one file changed'
+    assert_equal File.join(shipment.barcodes[0], '00000002.tif'),
+                 fixity[:changed][0].barcode_file, '00000002.tif changed'
+    assert_equal 1, fixity[:removed].count, 'one file changed'
+    assert_equal File.join(shipment.barcodes[0], '00000003.tif'),
+                 fixity[:removed][0].barcode_file, '00000003.tif removed'
   end
 end

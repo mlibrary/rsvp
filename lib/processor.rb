@@ -1,54 +1,56 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'digest'
 require 'json'
 require 'pathname'
 require 'yaml'
 
+require 'agenda'
 require 'config'
 require 'error'
 require 'progress_bar'
 require 'shipment'
+require 'stage'
 require 'string_color'
 require 'symbolize'
 
 # Processor
 class Processor # rubocop:disable Metrics/ClassLength
-  attr_reader :dir, :config, :status, :shipment
+  attr_reader :dir, :config, :shipment
 
   def initialize(dir, options = {})
     @shipment = Shipment.new(dir)
     @config = Config.new(options)
-    @status = { stages: {} }
+    config[:stages].each do |s|
+      require s[:file]
+    end
     init_status_file
+    stages
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    # Bail out with a message if any previous stage had an error.
-    discard_failure if config[:reset]
-    if had_previous_error?
-      puts 'Stage failed on previous run, aborting'.red
-      return
-    end
+  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    save_report_on_exception = Thread.report_on_exception
+    Thread.report_on_exception = false
     if config[:restart_all] && File.directory?(@shipment.source_directory)
       restore_from_source_directory
+    else
+      restore_from_source_directory changed_barcodes
     end
     stages.each do |stage|
-      next unless @status[:stages][stage.name.to_sym].nil? ||
-                  @status[:stages][stage.name.to_sym][:end].nil?
-
       run_stage stage
-      break if config[:one_stage] ||
-               @status[:stages][stage.name.to_sym][:errors].any?
+      break if config[:one_stage] || stage.fatal_error?
     end
+    Thread.report_on_exception = save_report_on_exception
     query
+    @agenda = nil
   end
 
-  def restore_from_source_directory
+  def restore_from_source_directory(barcodes = nil)
+    return if barcodes == []
+
     bar = ProgressBar.new('Processor')
     bar.steps = @shipment.source_barcode_directories.count
-    @shipment.restore_from_source_directory do |barcode|
+    @shipment.restore_from_source_directory(barcodes) do |barcode|
       bar.next! "copying from source/#{barcode}"
     end
     bar.done!
@@ -58,103 +60,87 @@ class Processor # rubocop:disable Metrics/ClassLength
     return @stages unless @stages.nil?
 
     @stages = []
-    @config[:stages].each do |s|
+    config[:stages].each do |s|
+      # The require step is also done when loading from JSON
       require s[:file]
       stage_class = Object.const_get(s[:class])
-      stage = stage_class.new(@shipment, config)
+      stage = stage_class.new(@shipment, config: config)
       stage.name = s[:name]
       @stages << stage
     end
     @stages
   end
 
-  def query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def query # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     stages.each do |stage|
-      stage_status = @status[:stages][stage.name.to_sym]
       print stage.name.bold + ' '
-      if stage_status.nil? || stage_status[:end].nil?
+      if stage.end.nil?
         puts 'not yet run'
-      elsif stage_status[:errors]&.any?
-        puts "failed with #{stage_status[:errors].count} errors".red
-      elsif stage_status[:warnings]&.any?
-        puts "succeeded with #{stage_status[:warnings].count} warnings".brown
+      elsif stage.fatal_error?
+        puts 'fatal error'.red
       else
-        puts "succeeded at #{stage_status[:end]}".green
+        bad = stage.error_barcodes
+        puts "#{bad.count}/#{@shipment.barcodes.count} barcodes failed," \
+             " #{stage.errors.count} errors," \
+             " #{stage.warnings.count} warnings"
       end
     end
   end
 
-  def error_query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    return @error_query unless @error_query.nil?
+  def agenda
+    @agenda ||= Agenda.new(@shipment, @stages)
+  end
 
-    @error_query = {}
+  # Map of stage name -> barcode + nil -> [Errors]
+  # Does not include stages with no errors
+  def errors
+    errs = {}
+    stages.each do |stage|
+      stage_errs = stage.errors_by_barcode
+      errs[stage.name] = stage_errs unless stage_errs.empty?
+    end
+    errs
+  end
+
+  # Map of stage name -> barcode + nil -> [Errors]
+  # Does not include stages with no errors
+  def warnings
+    warnings = {}
+    stages.each do |stage|
+      stage_warnings = stage.warnings_by_barcode
+      warnings[stage.name] = stage_warnings unless stage_warnings.empty?
+    end
+    warnings
+  end
+
+  # Map of barcode + nil -> stage name -> [Errors]
+  # Does not include barcodes with no errors
+  def errors_by_barcode_by_stage
+    errs = {}
     (@shipment.barcodes + [nil]).each do |b|
       stages.each do |stage|
-        stage_status = @status[:stages][stage.name.to_sym]
-        next if stage_status.nil?
+        stage_errs = stage.errors.select { |e| e.barcode == b }
+        next if stage_errs.none?
 
-        barcode_errors = stage_status[:errors].select { |e| e.barcode == b }
-        next if barcode_errors.nil? || barcode_errors.none?
-
-        (@error_query[b] ||= []) << { stage: stage.name,
-                                      errors: barcode_errors }
+        (errs[b] ||= {})[stage.name] = stage_errs
       end
     end
-    @error_query
+    errs
   end
 
-  def warning_query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    return @warning_query unless @warning_query.nil?
-
-    @warning_query = {}
+  # Map of barcode + nil -> stage name -> [Errors]
+  # Does not include barcodes with no warnings
+  def warnings_by_barcode_by_stage
+    warnings = {}
     (@shipment.barcodes + [nil]).each do |b|
       stages.each do |stage|
-        stage_status = @status[:stages][stage.name.to_sym]
-        next if stage_status.nil?
+        stage_warnings = stage.warnings.select { |e| e.barcode == b }
+        next if stage_warnings.none?
 
-        barcode_warnings = stage_status[:warnings].select { |e| e.barcode == b }
-        next if barcode_warnings.nil? || barcode_warnings.none?
-
-        (@warning_query[b] ||= []) << { stage: stage.name,
-                                        warnings: barcode_warnings }
+        (warnings[b] ||= {})[stage.name] = stage_warnings
       end
     end
-    @warning_query
-  end
-
-  # FIXME: the bulk of this code is shared with Postflight stage
-  # See Issue #24 -- this should be moved to the Shipment class
-  # or even a new metadata class.
-  def metadata_query # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    unless File.directory? @shipment.source_directory
-      return 'Source directory not yet populated'
-    end
-
-    added = []
-    removed = []
-    changed = []
-    bar = ProgressBar.new 'Metadata Check'
-    bar.steps = @shipment.source_image_files.count +
-                @shipment.metadata[:checksums].keys.count
-    @shipment.source_image_files.each do |image_file|
-      bar.next! "#{image_file.barcode_file} checksum"
-      if @shipment.metadata[:checksums][image_file.path].nil?
-        added << image_file.path
-      else
-        sha256 = Digest::SHA256.file image_file.path
-        if @shipment.metadata[:checksums][image_file.path] !=
-           sha256.hexdigest
-          changed << image_file.path
-        end
-      end
-    end
-    @shipment.metadata[:checksums].keys.sort.map(&:to_s).each do |path|
-      bar.next! "#{@shipment.barcode_file_from_path(path)} existence"
-      removed << path unless File.exist? path.to_s
-    end
-    bar.done!
-    "Source directory changes: #{added.count} added," \
-    " #{removed.count} removed, #{changed.count} changed"
+    warnings
   end
 
   def status_file
@@ -164,55 +150,34 @@ class Processor # rubocop:disable Metrics/ClassLength
   def write_status
     puts "Writing status file #{status_file}" if config[:verbose]
     File.open(status_file, 'w') do |f|
-      f.write JSON.pretty_generate(shipment: @shipment,
-                                   stages: @status[:stages])
+      f.write JSON.pretty_generate({ shipment: shipment,
+                                     stages: stages })
     end
   end
 
   private
 
-  def had_previous_error?
-    stages.each do |stage|
-      if @status[:stages][stage.name.to_sym]
-        errors = @status[:stages][stage.name.to_sym][:errors]
-        return true if errors&.count&.positive?
-      end
-    end
-    false
-  end
-
-  # Alter @status by discarding failed stage and anything after it.
-  def discard_failure # rubocop:disable Metrics/AbcSize
-    have_error = false
-    stages.each do |stage|
-      if @status[:stages][stage.name.to_sym]
-        have_error ||= @status[:stages][stage.name.to_sym][:errors]&.any?
-      end
-      @status[:stages].delete stage.name.to_sym if have_error
-    end
-  end
-
-  # Return array of errors, possibly empty
   def run_stage(stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    @status[:stages][stage.name.to_sym] = { start: Time.now, errors: [] }
-    errors = []
-    print_progress "Running stage #{stage.name}"
+    stage_agenda = agenda.for_stage stage
+    stage.reinitialize!
+    print_progress "Running stage #{stage.name} with #{agenda}"
+    interrupt = false
     begin
-      stage.run
-      errors = stage.errors
+      stage.run! stage_agenda
+    rescue Interrupt
+      puts "\nInterrupted".red
+      stage.add_error Error.new('Interruped')
+      interrupt = true
     rescue StandardError => e
-      errors << Error.new("#{e.inspect} #{e.backtrace}")
+      stage.add_error Error.new("#{e.inspect} #{e.backtrace}")
+      puts "#{e.inspect} #{e.backtrace}"
     ensure
-      stage.cleanup
+      stage.cleanup interrupt
+      agenda.update stage
     end
-    @status[:stages][stage.name.to_sym].merge!({ end: Time.now,
-                                                 errors: errors,
-                                                 warnings: stage.warnings,
-                                                 data: stage.data || {} })
-    errors
   end
 
-  def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     return unless File.exist? status_file
 
     if config[:restart_all]
@@ -221,21 +186,33 @@ class Processor # rubocop:disable Metrics/ClassLength
       # In order to reconstitute Error objects we need to use JSON.load
       # instead of JSON.parse. So we explicitly symbolize the output.
       # rubocop:disable Security/JSONLoad
-      @status = Symbolize.symbolize JSON.load File.new(status_file)
+      status = Symbolize.symbolize JSON.load File.new(status_file)
       # rubocop:enable Security/JSONLoad
-      raise JSON::ParserError, "unable to parse #{status_file}" if @status.nil?
+      raise JSON::ParserError, "unable to parse #{status_file}" if status.nil?
 
-      # Support legacy 'metadata' in status struct
-      # This can be removed when backwards compatibility is no longer an issue.
-      # The delete calls are to expose code that relies on the old data layout.
-      if @status.key?(:shipment) && @status[:shipment].is_a?(Shipment)
-        @shipment = @status[:shipment]
-        @status.delete :shipment
-      elsif @status.key? :metadata
-        @shipment.metadata = @status[:metadata]
-        @status.delete :metadata
+      unless status.key?(:shipment) && status[:shipment].is_a?(Shipment)
+        raise StandardError, 'status.json has no Shipment object'
+      end
+
+      unless status.key?(:stages) && status[:stages].is_a?(Array) &&
+             status[:stages].all? { |s| s.is_a? Stage }
+        raise StandardError, 'status.json has no Stage array'
+      end
+
+      @shipment = status[:shipment]
+      @stages = status[:stages]
+      @stages.each do |s|
+        s.shipment = @shipment
+        s.config = @config
       end
     end
+  end
+
+  def changed_barcodes
+    fixity = shipment.fixity_check
+    [fixity[:added].collect(&:barcode),
+     fixity[:removed].collect(&:barcode),
+     fixity[:changed].collect(&:barcode)].flatten.uniq
   end
 
   # Verbose printing of progress information

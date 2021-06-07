@@ -3,15 +3,15 @@
 
 # Single-line CLI ASCII art progress bar
 class ProgressBar
-  attr_accessor :error, :steps
-  attr_reader :done, :config
+  attr_accessor :error, :warning, :steps, :done
+  attr_reader :config
 
-  def initialize(owner = '', config = {})
+  def initialize(owner = '')
     @done = 0
     @steps = 1
     @owner = owner
-    @config = config
     @error = false
+    @warning = false
     @newline = false
   end
 
@@ -38,10 +38,11 @@ class ProgressBar
   # The \033[K is to erase the entire line in case a previous action string
   # might not be completely overwritten by a subsequent shorter one.
   def draw(action = '')
-    return if config[:no_progress] || @newline
+    return if @newline
 
     progress = @steps.zero? ? 10 : 10 * @done / @steps
     bar = format '%<bar>-10s', bar: segment * progress
+    bar = bar.brown if @warning
     bar = bar.red if @error
     printf("\r\033[K%-16s |%s| (#{done}/#{steps}) #{action}",
            @owner, bar)
@@ -55,5 +56,12 @@ class ProgressBar
 
   def segment
     @segment ||= '█'.encode('utf-8')
+  end
+end
+
+# ProgressBar that doesn't draw anything
+class SilentProgressBar < ProgressBar
+  def draw(action = '')
+    # No-op
   end
 end

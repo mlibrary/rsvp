@@ -8,53 +8,54 @@ require 'stage'
 
 # Image Metadata Validation Stage
 class Postflight < Stage
-  def run
+  def run(agenda) # rubocop:disable Metrics/MethodLength
     @bar.steps = steps
-    shipment.barcodes.each do |b|
-      @bar.next! "validate #{b}"
-      run_feed_validate_script(b)
+    barcode_directories.each do |path|
+      barcode = path.split(File::SEPARATOR)[-1]
+      unless agenda.include? barcode
+        @bar.next! "#{barcode} skipped"
+        next
+      end
+      @bar.next! "validate #{barcode}"
+      run_feed_validate_script(barcode)
     end
     @bar.next! 'barcode check'
     check_barcode_lists
     @bar.next! 'verify checksums'
     verify_source_checksums
-    cleanup
   end
 
   private
 
   def steps
-    barcode_directories.count + 1 +
+    shipment.barcodes.count + 1 +
       shipment.source_image_files.count +
-      shipment.metadata[:checksums].keys.count
+      shipment.checksums.keys.count
   end
 
   def check_barcode_lists # rubocop:disable Metrics/AbcSize
     s1 = Set.new shipment.metadata[:initial_barcodes]
     s2 = Set.new shipment.barcodes
-    add_error Error.new("barcodes removed: #{s1 - s2}") if (s1 - s2).any?
-    add_error Error.new("barcodes added: #{s2 - s1}") if (s2 - s1).any?
+    if (s1 - s2).any?
+      add_error Error.new("barcodes removed: #{(s1 - s2).to_a.join(', ')}")
+    end
+    return unless (s2 - s1).any?
+
+    add_error Error.new("barcodes added: #{(s2 - s1).to_a.join(', ')}")
   end
 
   def verify_source_checksums # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    shipment.source_image_files.each do |image_file|
-      checksum = shipment.metadata[:checksums][image_file.path]
-      @bar.next! "#{image_file.barcode_file} checksum"
-      if checksum.nil?
-        add_error Error.new('SHA missing', image_file.barcode, image_file.path)
-      else
-        sha256 = Digest::SHA256.file image_file.path
-        if checksum != sha256.hexdigest
-          desc = "SHA mismatch: #{checksum} vs #{sha256.hexdigest}"
-          add_error Error.new(desc, image_file.barcode, image_file.path)
-        end
-      end
+    fixity = shipment.fixity_check do |image_file|
+      @bar.next! image_file.barcode_file
     end
-    shipment.metadata[:checksums].keys.map(&:to_s).each do |path|
-      @bar.next! "#{@shipment.barcode_file_from_path(path)} existence"
-      unless File.exist? path
-        add_error Error.new('file missing', barcode_from_path(path), path)
-      end
+    fixity[:added].each do |image_file|
+      add_error Error.new('SHA missing', image_file.barcode, image_file.path)
+    end
+    fixity[:removed].each do |image_file|
+      add_error Error.new('file missing', image_file.barcode, image_file.path)
+    end
+    fixity[:changed].each do |image_file|
+      add_error Error.new('SHA modified', image_file.barcode, image_file.path)
     end
   end
 

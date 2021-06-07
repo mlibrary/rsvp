@@ -1,12 +1,13 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'digest'
 require 'json'
 
 ImageFile = Struct.new(:barcode, :path, :barcode_file)
 
 # Shipment directory class
-class Shipment
+class Shipment # rubocop:disable Metrics/ClassLength
   attr_reader :metadata
 
   def self.json_create(hash)
@@ -18,13 +19,7 @@ class Shipment
 
     @dir = dir
     @metadata = metadata || {}
-    # Symbolize top-level metadata keys
-    @metadata.keys.each do |key| # rubocop:disable Style/HashEachMethods
-      if key.is_a? String
-        @metadata[key.to_sym] = @metadata[key]
-        @metadata.delete key
-      end
-    end
+    @metadata.transform_keys!(&:to_sym)
   end
 
   def to_json(*args)
@@ -47,14 +42,18 @@ class Shipment
   end
 
   def barcode_directories
-    barcodes.map { |b| File.join(@dir, b) }
+    barcodes.map { |b| barcode_directory b }
   end
 
   def barcodes
     bars = Dir.entries(@dir).reject do |b|
       %w[. .. source tmp].include? b
     end
-    bars.select { |b| File.directory?(File.join(@dir, b)) }.sort
+    bars.select { |b| File.directory?(barcode_directory(b)) }.sort
+  end
+
+  def barcode_directory(barcode)
+    File.join(@dir, barcode)
   end
 
   def source_barcode_directories
@@ -65,10 +64,13 @@ class Shipment
     bars = Dir.entries(source_directory).reject do |b|
       %w[. ..].include? b
     end
-    bars.select { |b| File.directory?(File.join(@dir, 'source', b)) }.sort
+    bars.select { |b| File.directory?(File.join(source_directory, b)) }.sort
   end
 
-  # FIXME: these may not be used any more
+  def source_barcode_directory(barcode)
+    File.join(source_directory, barcode)
+  end
+
   def barcode_from_path(path)
     path.split(File::SEPARATOR)[-2]
   end
@@ -77,12 +79,10 @@ class Shipment
     path.split(File::SEPARATOR)[-2..].join(File::SEPARATOR)
   end
 
-  # Think twice about trying to memoize this.
-  # Compression will change the names of image files if not the quantity.
   def image_files(type = 'tif')
     files = []
     barcodes.each do |b|
-      barcode_dir = File.join(@dir, b)
+      barcode_dir = barcode_directory b
       entries = Dir.entries(barcode_dir).reject { |e| %w[. ..].include? e }
       entries.each do |e|
         next unless e.end_with? type
@@ -93,15 +93,16 @@ class Shipment
     files
   end
 
-  def source_image_files(type = 'tif')
+  def source_image_files(type = 'tif') # rubocop:disable Metrics/AbcSize
     files = []
+    return files unless File.directory? source_directory
+
     source_barcodes.each do |b|
-      barcode_dir = File.join(@dir, 'source', b)
-      entries = Dir.entries(barcode_dir).reject { |e| %w[. ..].include? e }.sort
-      entries.each do |e|
+      dir = File.join(source_directory, b)
+      Dir.entries(dir).reject { |e| %w[. ..].include? e }.sort.each do |e|
         next unless e.end_with? type
 
-        files << ImageFile.new(b, File.join(barcode_dir, e), File.join(b, e))
+        files << ImageFile.new(b, File.join(dir, e), File.join(b, e))
       end
     end
     files
@@ -125,17 +126,65 @@ class Shipment
     end
   end
 
-  def restore_from_source_directory(*barcode_list) # rubocop:disable Metrics/AbcSize
+  def restore_from_source_directory(barcode_array = nil)
     unless File.directory? source_directory
       raise Errno::ENOENT, "source directory #{source_directory} not found"
     end
 
-    barcode_list = source_barcodes if barcode_list.size.zero?
-    barcode_list.each do |barcode|
+    barcode_array = source_barcodes if barcode_array.nil?
+    barcode_array.each do |barcode|
       yield barcode if block_given?
-      dest = File.join(@dir, barcode)
+      dest = barcode_directory barcode
       FileUtils.rm_r(dest, force: true) if File.exist? dest
       FileUtils.copy_entry(File.join(source_directory, barcode), dest)
     end
+  end
+
+  ### === METADATA METHODS === ###
+  def checksums
+    metadata[:checksums] || {}
+  end
+
+  def checksum(image_file)
+    Digest::SHA256.file(image_file.path).hexdigest
+  end
+
+  # Add SHA256 entries to metadata for each source/barcode/file.
+  # If a block is passed, calls it one for each barcode in the source directory.
+  # Must be called after #setup_source_directory.
+  def checksum_source_directory
+    metadata[:checksums] = {}
+    last_barcode = nil
+    source_image_files.each do |image_file|
+      if block_given? && last_barcode != image_file.barcode
+        yield image_file.barcode
+      end
+      metadata[:checksums][image_file.barcode_file] = checksum(image_file)
+      last_barcode = image_file.barcode
+    end
+  end
+
+  # Returns Hash with keys {added, changed, removed} -> Array of ImageFile
+  def fixity_check # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    fixity = { added: [], removed: [], changed: [] }
+    return fixity if metadata[:checksums].nil?
+
+    source_image_files.each do |image_file|
+      yield image_file if block_given?
+      if checksums[image_file.barcode_file].nil?
+        fixity[:added] << image_file
+      elsif checksums[image_file.barcode_file] != checksum(image_file)
+        fixity[:changed] << image_file
+      end
+    end
+
+    checksums.keys.sort.each do |barcode_file|
+      image_file = ImageFile.new(barcode_from_path(barcode_file),
+                                 File.join(source_directory, barcode_file),
+                                 barcode_file)
+      yield image_file if block_given?
+      fixity[:removed] << image_file unless File.exist? image_file.path
+    end
+    fixity
   end
 end

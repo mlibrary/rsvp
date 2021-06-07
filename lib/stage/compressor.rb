@@ -23,9 +23,12 @@ end
 
 # TIFF to JP2/TIFF compression stage
 class Compressor < Stage # rubocop:disable Metrics/ClassLength
-  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    @bar.steps = image_files.count
-    image_files.each_with_index do |image_file, i|
+  def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+    return unless agenda.any?
+
+    files = image_files.select { |file| agenda.include? file.barcode }
+    @bar.steps = files.count
+    files.each_with_index do |image_file, i|
       metadata = tiffinfo(image_file)
       next if metadata.nil?
 
@@ -54,7 +57,6 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
                             image_file.barcode, image_file.path)
       end
     end
-    cleanup
   end
 
   private
@@ -78,16 +80,16 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     stdout_str
   end
 
-  def handle_8_bps_conversion(file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_8_bps_conversion(path, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tmpdir = create_tempdir
     sparse = File.join(tmpdir, 'sparse.tif')
     new_image = File.join(tmpdir, 'new.jp2')
-    final_image = File.join(File.dirname(file),
-                            File.basename(file, '.*') + '.jp2')
+    final_image = File.join(File.dirname(path),
+                            File.basename(path, '.*') + '.jp2')
 
     # We don't want any XMP metadata to be copied over on its own. If
     # it's been a while since we last ran exiftool, this might take a sec.
-    remove_tiff_metadata(file, sparse)
+    remove_tiff_metadata(path, sparse)
 
     alpha_channel = false
     if /Extra\sSamples:\s1<unassoc-alpha>/.match? metadata
@@ -113,13 +115,13 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # We have our JP2; we can remove the middle TIFF. Then we try
     # to grab metadata from the original TIFF. This should be very
     # quick since we just used exiftool a few lines back.
-    copy_jp2_metadata(file, new_image, final_image, metadata)
+    copy_jp2_metadata(path, new_image, final_image, metadata)
     # If our image had an alpha channel, it'll be gone now, and
     # the XMP data needs to reflect that (previously, we were
     # taking that info from the original image).
     copy_jp2_alphaless_metadata(sparse, new_image) if alpha_channel
-    copy_on_success new_image, final_image
-    delete_on_success file
+    copy_on_success new_image, final_image, barcode_from_path(path)
+    delete_on_success path, barcode_from_path(path)
   end
 
   def jp2_clevels(metadata)
@@ -163,7 +165,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
       FileUtils.mv(tmp, path)
     else
       warning = "couldn't remove ICC profile (#{cmd}) (#{stderr_str})"
-      add_warning Error.new(warning, shipment.barcode_from_path(path), path)
+      add_warning Error.new(warning, barcode_from_path(path), path)
     end
   end
 
@@ -256,7 +258,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     else
       write_tiff_software(page1, match[1])
     end
-    copy_on_success page1, path
+    copy_on_success page1, path, barcode_from_path(path)
   end
 
   # Try to compress the image. This is the only part of this step

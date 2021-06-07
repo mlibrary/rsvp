@@ -5,20 +5,19 @@ require 'stage'
 
 # Pagination Stage
 class PaginationCheck < Stage
-  def run
-    @re = /^([0-9]{8})\.(?:tif|jp2)$/
-    @bar.steps = shipment.barcodes.count
-    shipment.barcodes.each do |barcode|
-      @bar.next! barcode
-      find_errors_in_barcode(barcode)
+  IMAGE_FILE_RE = /^([0-9]{8})\.(?:tif|jp2)$/.freeze
+
+  def run(agenda)
+    agenda.each do |b|
+      @bar.next! b
+      find_barcode_errors b
     end
-    cleanup
   end
 
   private
 
-  def find_errors_in_barcode(barcode)
-    dir = File.join(shipment.directory, barcode)
+  def find_barcode_errors(barcode)
+    dir = @shipment.barcode_directory barcode
     pages = pages_in_dir(dir)
     missing = missing_pages(pages)
     if missing.count.positive?
@@ -34,7 +33,7 @@ class PaginationCheck < Stage
     entries = Dir.entries(dir)
     pages = []
     entries.each do |entry|
-      match = entry.match @re
+      match = entry.match IMAGE_FILE_RE
       pages << match[1].to_i if match
     end
     pages.sort

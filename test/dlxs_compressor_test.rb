@@ -18,22 +18,31 @@ class DLXSCompressorTest < Minitest::Test
 
   def test_new
     shipment = TestShipment.new(test_name)
-    stage = DLXSCompressor.new(shipment, @config)
+    stage = DLXSCompressor.new(shipment, config: @config)
     refute_nil stage, 'stage successfully created'
   end
 
   def test_run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T contone 1')
-    stage = Compressor.new(shipment, @config)
-    stage.run
+    stage = Compressor.new(shipment, config: @config)
+    stage.run!
     assert_equal(0, stage.errors.count, 'compressor stage runs without errors')
-    stage = DLXSCompressor.new(shipment, @config)
-    stage.run
+    stage = DLXSCompressor.new(shipment, config: @config)
+    stage.run!
     tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
     assert File.exist?(tiff), '00000001.tif exists'
     jp2 = File.join(shipment.directory, shipment.barcodes[0], '00000001.jp2')
     refute File.exist?(jp2), '00000001.jp2 does not exist'
     jp2 = File.join(shipment.directory, shipment.barcodes[0], 'p0000001.jp2')
     assert File.exist?(jp2), 'p0000001.jp2 exists'
+  end
+end
+
+class DLXSCompressorErrorTest < MiniTest::Test
+  def test_new
+    err = DLXSCompressorError.new('message', 'command', '(detail)')
+    refute_nil err, 'DLXSCompressorError successfully created'
+    assert_kind_of StandardError, err, 'error is a kind of StandardError'
+    assert_instance_of DLXSCompressorError, err, 'error is DLXSCompressorError'
   end
 end
