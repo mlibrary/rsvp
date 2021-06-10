@@ -34,7 +34,7 @@ class QueryTool
     end
   end
 
-  def barcodes_cmd(*_args)
+  def barcodes_cmd
     processor.shipment.barcodes.each do |b|
       puts b.bold
     end
@@ -72,7 +72,7 @@ class QueryTool
     end
   end
 
-  def fixity_cmd(*_args) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def fixity_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     unless File.directory? processor.shipment.source_directory
       puts 'Source directory not yet populated'
     end

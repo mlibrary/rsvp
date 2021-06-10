@@ -83,13 +83,13 @@ begin
       when 'agenda'
         tool.agenda_cmd args
       when 'barcodes', 'ls'
-        tool.barcodes_cmd args
+        tool.barcodes_cmd
       when 'errors'
         tool.errors_cmd args
       when 'help', '?'
         puts command_summary
       when 'fixity'
-        tool.fixity_cmd args
+        tool.fixity_cmd
       when 'quit', 'exit'
         break
       when 'run'
