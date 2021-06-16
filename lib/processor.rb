@@ -18,8 +18,9 @@ require 'symbolize'
 class Processor # rubocop:disable Metrics/ClassLength
   attr_reader :dir, :config, :shipment
 
+  # Can take either a directory path or a Shipment
   def initialize(dir, options = {})
-    @shipment = Shipment.new(dir)
+    @shipment = dir.is_a?(Shipment) ? dir : Shipment.new(dir)
     @config = Config.new(options)
     config[:stages].each do |s|
       require s[:file]
