@@ -81,11 +81,11 @@ begin
     begin
       case cmd
       when 'agenda'
-        tool.agenda_cmd args
+        tool.agenda_cmd
       when 'barcodes', 'ls'
         tool.barcodes_cmd
       when 'errors'
-        tool.errors_cmd args
+        tool.errors_cmd(*args)
       when 'help', '?'
         puts command_summary
       when 'fixity'
@@ -103,7 +103,7 @@ begin
       when 'status'
         processor.query
       when 'warnings'
-        tool.warnings_cmd args
+        tool.warnings_cmd(*args)
       else
         next if cmd.nil?
 
