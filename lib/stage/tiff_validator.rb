@@ -9,17 +9,19 @@ class TIFFValidator < Stage
   BITONAL_RES = '600'
   CONTONE_RES = '400'
 
-  def run
-    image_files.each_with_index do |image_file, i|
-      @bar.steps = image_files.count
-      @bar.step! i, image_file.barcode_file
+  def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    return unless agenda.any?
+
+    files = image_files.select { |file| agenda.include? file.barcode }
+    @bar.steps = files.count
+    files.each do |image_file|
+      @bar.next! image_file.barcode_file
       fields = extract_tiff_fields run_tiffinfo(image_file)
       err = evaluate fields
       unless err.nil?
         add_error Error.new(err, image_file.barcode, image_file.path)
       end
     end
-    cleanup
   end
 
   private

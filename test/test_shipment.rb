@@ -6,6 +6,8 @@ require 'fixtures'
 require_relative '../lib/shipment'
 
 class TestShipment < Shipment
+  attr_reader :ordered_barcodes
+
   PATH = File.join(__dir__, 'shipments').freeze
   @test_shipments = []
 
@@ -46,6 +48,7 @@ class TestShipment < Shipment
     FileUtils.rm_r(dir, force: true) if File.directory? dir
     Dir.mkdir(dir)
     super dir
+    @ordered_barcodes = []
     process_spec spec
   end
 
@@ -78,12 +81,14 @@ class TestShipment < Shipment
     barcode = self.class.generate_barcode(true)
     @current_dir = File.join(@dir, barcode)
     Dir.mkdir(@current_dir)
+    @ordered_barcodes << barcode
   end
 
   def handle_bogus_barcode_op
     barcode = self.class.generate_barcode(false)
     @current_dir = File.join(@dir, barcode)
     Dir.mkdir(@current_dir)
+    @ordered_barcodes << barcode
   end
 
   def handle_tiff_op(name, dest) # rubocop:disable Metrics/MethodLength

@@ -1,95 +1,191 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'json'
 require 'tempfile'
+require 'time'
 
 require 'config'
 require 'error'
 require 'progress_bar'
+require 'symbolize'
 
 # Base class for conversion stages
-class Stage
-  attr_reader :data, :config
-  attr_accessor :name, :shipment
+class Stage # rubocop:disable Metrics/ClassLength
+  attr_reader :errors, :warnings, :start, :end
+  attr_accessor :name, :config, :shipment
 
-  def initialize(shipment, config = nil) # rubocop:disable Metrics/MethodLength
-    unless shipment.is_a? Shipment
-      raise StandardError,
-            "shipment class #{shipment.class} for #{self.class}#initialize"
-    end
-
-    @name = self.class.to_s
-    @config = config || Config.new
-    @shipment = shipment
-    # FIXME: change this back to @errors when tests are passing,
-    # maybe restore attr_reader
-    @errs = [] # Fatal conditions, Array of Error
-    @warns = [] # Nonfatal conditions, Array of Error
-    @data = {} # A data structure that is written to status.json for the stage
-    @bar = ProgressBar.new(self.class, config)
+  def self.json_create(hash)
+    data = Symbolize.symbolize hash['data']
+    new nil, **data
   end
 
-  def run
-    raise "#{self.class.name}.run() method unimplemented"
+  def to_json(*args)
+    {
+      'json_class' => self.class.name,
+      'data' => { name: @name,
+                  errors: @errors,
+                  warnings: @warnings,
+                  data: @data,
+                  start: @start.to_s,
+                  end: @end.to_s }
+    }.to_json(*args)
+  end
+
+  # Can be created without a shipment, but that field needs to be set
+  # before the #run method can be called.
+  def initialize(shipment, **args) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    unless shipment.nil? || shipment.is_a?(Shipment)
+      raise StandardError, "unknown shipment class #{shipment.class}"
+    end
+
+    @shipment = shipment
+    @name = args[:name] || self.class.to_s
+    @config = args[:config] || {} # Top-level Config object
+    @errors = args[:errors] || [] # Fatal conditions, Array of Error
+    @warnings = args[:warnings] || [] # Nonfatal conditions, Array of Error
+    @data = args[:data] || {} # Misc data structure including log
+    # Time the stage was last run (may be unneeded)
+    @start = if args[:start].to_s == ''
+               nil
+             else
+               Time.parse args[:start]
+             end
+    # Time the stage last finished running (may be unneeded)
+    # Currently used by #complete?
+    @end = if args[:end].to_s == ''
+             nil
+           else
+             Time.parse args[:end]
+           end
+    @bar = if config[:no_progress]
+             SilentProgressBar.new(self.class)
+           else
+             ProgressBar.new(self.class)
+           end
+  end
+
+  # Get rid of errors, warnings, and anything that may have been memoized
+  def reinitialize!
+    @errors = []
+    @warnings = []
+    @bar.done = 0
+  end
+
+  def run!(agenda = nil)
+    @start = Time.now
+    agenda = shipment.barcodes if agenda.nil?
+    @bar.steps = agenda.count
+    run agenda
+    cleanup
+    @end = Time.now
+  end
+
+  # This is the method that needs to be implemented by a subclass
+  def run(_agenda)
+    raise "#{self.class.name}#run method unimplemented"
   end
 
   def add_error(err)
-    raise "nil err passed to #{self.class}#add_error" if err.nil?
     raise "#{err.class} passed to add_error" unless err.is_a? Error
+    unless err.barcode.nil? || barcodes.member?(err.barcode)
+      raise "unknown error barcode #{err.barcode}"
+    end
 
     @bar.error = true
-    @errs << err
+    @errors << err
   end
 
   def add_warning(err)
-    raise "nil err passed to #{self.class}#add_warning" if err.nil?
     raise "#{err.class} passed to add_warning" unless err.is_a? Error
+    unless err.barcode.nil? || barcodes.member?(err.barcode)
+      raise "unknown warning barcode #{err.barcode}"
+    end
 
-    @warns << err
+    @bar.warning = true
+    @warnings << err
   end
 
-  def errors
-    @errs
+  # Map of barcodes + nil -> [Errors]
+  # Does not include barcodes with no errors
+  def errors_by_barcode
+    errors.each_with_object({}) do |err, memo|
+      (memo[err.barcode] ||= []) << err
+    end
   end
 
-  def warnings
-    @warns
+  # Map of barcodes + nil -> [Errors]
+  # Does not include barcodes with no warnings
+  def warnings_by_barcode
+    warnings.each_with_object({}) do |err, memo|
+      (memo[err.barcode] ||= []) << err
+    end
   end
 
-  # OK to make destructive changes to the shipment
-  # FIXME: rename make_changes_to_barcode?
-  def make_changes?
-    @errs.none? && !config[:noop]
+  def error_barcodes
+    errors_by_barcode.keys.compact
+  end
+
+  # Any error with barcode == nil is fatal.
+  def fatal_error?
+    errors_by_barcode.key? nil
+  end
+
+  def delete_errors_for_barcode(barcode)
+    @errors.delete_if { |e| e.barcode == barcode }
+  end
+
+  def delete_warnings_for_barcode(barcode)
+    @warnings.delete_if { |w| w.barcode == barcode }
+  end
+
+  # OK to make destructive changes to the shipment for this barcode?
+  # With nil barcode checks for presence of any error.
+  def make_changes?(barcode = nil)
+    return @errors.none? if barcode.nil?
+
+    @errors.none? { |e| e.barcode == barcode || e.barcode.nil? }
+  end
+
+  # True if the stage has been run and all possible errors have
+  # had a chance to surface
+  def complete?
+    !@end.nil?
   end
 
   # Expected to be run as part of #run,
   # may be called multiple times.
-  def cleanup
-    @bar.done!
+  def cleanup(interrupt = false)
     cleanup_copy_on_success
     cleanup_delete_on_success
     cleanup_tempdirs
+    @bar.done! unless interrupt
   end
 
   def cleanup_copy_on_success
     return if @copy_on_success.nil?
 
     while @copy_on_success.any?
-      pair = @copy_on_success.pop
-      FileUtils.cp pair[0], pair[1] if make_changes?
+      copy = @copy_on_success.pop
+      if make_changes? copy[:barcode]
+        FileUtils.cp copy[:source], copy[:destination]
+      end
     end
   end
 
   def cleanup_delete_on_success
     return if @delete_on_success.nil? || !make_changes?
 
-    FileUtils.rm @delete_on_success.pop while @delete_on_success.any?
+    @delete_on_success.each do |del|
+      FileUtils.rm del[:path] if make_changes? del[:barcode]
+    end
+    @delete_on_success = nil
   end
 
   def cleanup_tempdirs
-    return if @tempdirs.nil?
-
-    FileUtils.rm_rf @tempdirs.pop while @tempdirs.any?
+    unless @tempdirs.nil? # ruboccop:disable Style/IfUnlessModifier
+      FileUtils.rm_rf @tempdirs.pop while @tempdirs.any?
+    end
     return unless File.directory? shipment.tmp_directory
 
     FileUtils.rm_rf shipment.tmp_directory
@@ -104,13 +200,18 @@ class Stage
   end
 
   # source is copied to destination on success,
-  # left alone on failure or if noop option flag is set.
-  def copy_on_success(source, destination)
-    (@copy_on_success ||= []) << [source, destination]
+  # left alone on failure.
+  def copy_on_success(source, destination, barcode)
+    (@copy_on_success ||= []) << { source: source, destination: destination,
+                                   barcode: barcode }
   end
 
-  def delete_on_success(path)
-    (@delete_on_success ||= []) << path
+  def delete_on_success(path, barcode = nil)
+    (@delete_on_success ||= []) << { path: path, barcode: barcode }
+  end
+
+  def barcodes
+    shipment.barcodes
   end
 
   def barcode_from_path(path)

@@ -12,6 +12,7 @@ end
 APP_ROOT = File.expand_path('..', __dir__)
 TEST_ROOT = File.expand_path(__dir__)
 $LOAD_PATH << File.join(APP_ROOT, 'lib')
+$LOAD_PATH << File.join(APP_ROOT, 'lib', 'stage')
 $LOAD_PATH << TEST_ROOT
 
 require 'minitest'

@@ -20,56 +20,42 @@ class Preflight < Stage
        checksum.md5 prodnote.tif]
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment.metadata[:initial_barcodes] = []
     validate_shipment_directory
     if shipment.metadata[:initial_barcodes].none?
       add_error Error.new("no barcode directories in #{shipment_directory}")
       return
     end
-    @bar.steps = 2 * shipment.metadata[:initial_barcodes].count
-    unless File.directory? source_directory
-      @bar.steps += shipment.metadata[:initial_barcodes].count
-    end
+    @bar.steps = steps(agenda)
     shipment.setup_source_directory do |barcode|
       @bar.next! "setup source/#{barcode}"
     end
-    checksum_source_directory do |barcode|
+    shipment.checksum_source_directory do |barcode|
       @bar.next! "checksum source/#{barcode}"
     end
-    shipment.metadata[:initial_barcodes].each do |barcode|
+    agenda.each do |barcode|
       unless Luhn.valid? barcode
         add_warning Error.new('Luhn checksum failed', barcode)
       end
       @bar.next! "validate #{barcode}"
       validate_barcode_directory barcode
     end
-    cleanup
-  end
-
-  # Add SHA256 entries to shipment metadata for each source/barcode/file.
-  def checksum_source_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    last_barcode = nil
-    shipment.metadata[:checksums] = {} if shipment.metadata[:checksums].nil?
-    shipment.source_image_files.each do |image_file|
-      if block_given? && (last_barcode.nil? ||
-                          last_barcode != image_file.barcode)
-        yield image_file.barcode
-      end
-      sha256 = Digest::SHA256.file image_file.path
-      shipment.metadata[:checksums][image_file.path] = sha256.hexdigest
-      last_barcode = image_file.barcode
-    end
   end
 
   private
 
+  def steps(agenda)
+    steps = (2 * shipment.barcodes.count) + agenda.count
+    steps += shipment.barcodes.count unless File.directory? source_directory
+    steps
+  end
+
   # A shipment directory is valid if it contains only barcode directories,
   # a source directory, and status.json
-  def validate_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def validate_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     Dir.entries(shipment_directory).sort.each do |entry|
-      next if %w[. .. source tmp].include? entry
-      next if entry == 'status.json'
+      next if %w[. .. source tmp status.json].include? entry
 
       path = File.join(shipment_directory, entry)
       next if entry == 'source' && File.directory?(path)

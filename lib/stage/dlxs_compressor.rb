@@ -13,13 +13,15 @@ end
 
 # JP2-to-TIFF conversion stage for DLXS
 class DLXSCompressor < Stage
-  def run # rubocop:disable Metrics/MethodLength
-    files = image_files('jp2')
+  def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    return unless agenda.any?
+
+    files = image_files('jp2').select { |file| agenda.include? file.barcode }
     @bar.steps = files.count
     files.each_with_index do |image_file, i|
       @bar.step! i, image_file.barcode_file
       begin
-        handle_conversion(image_file.path)
+        handle_conversion image_file
       rescue DLXSCompressorError => e
         add_error Error.new(e.message, image_file.barcode, image_file.path)
       end
@@ -29,18 +31,19 @@ class DLXSCompressor < Stage
 
   private
 
-  def handle_conversion(path) # rubocop:disable Metrics/MethodLength
+  def handle_conversion(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tmpdir = create_tempdir
     contone = File.join(tmpdir, 'contone.tif')
     bitonal = File.join(tmpdir, 'bitonal.tif')
-    final_image = File.join(File.dirname(path),
-                            File.basename(path, '.*') + '.tif')
-    expand_jp2(path, contone)
+    final_image = File.join(File.dirname(image_file.path),
+                            File.basename(image_file.path, '.*') + '.tif')
+    expand_jp2(image_file.path, contone)
     convert_to_tiff contone, bitonal
     FileUtils.rm contone
-    copy_on_success bitonal, final_image
-    copy_on_success path, jp2_name(path)
-    delete_on_success path
+    copy_on_success bitonal, final_image, image_file.barcode
+    copy_on_success image_file.path, jp2_name(image_file.path),
+                    image_file.barcode
+    delete_on_success image_file.path
   end
 
   # Expand existing jp2 into tif in temp directory
