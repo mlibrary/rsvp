@@ -18,7 +18,7 @@ class ProcessorTest < Minitest::Test
 
   def test_new
     shipment = TestShipment.new(test_name)
-    processor = Processor.new(shipment.directory)
+    processor = Processor.new(shipment)
     refute_nil processor, 'processor successfully created'
     refute File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json not created yet'
@@ -29,7 +29,7 @@ class ProcessorTest < Minitest::Test
 
   def test_config
     shipment = TestShipment.new(test_name)
-    processor = Processor.new(shipment.directory, @options)
+    processor = Processor.new(shipment, @options)
     refute_nil processor, 'processor successfully created'
     assert_match(/fake_feed_validate/, processor.config[:feed_validate_script],
                  'has custom feed validate path')
@@ -46,7 +46,7 @@ class ProcessorTest < Minitest::Test
 
   def test_stages
     shipment = TestShipment.new(test_name)
-    processor = Processor.new(shipment.directory)
+    processor = Processor.new(shipment)
     assert_kind_of Array, processor.stages, 'processor#stages is Array'
     assert_kind_of Stage, processor.stages[0],
                    'processor#stages is Array of Stage'
@@ -54,14 +54,14 @@ class ProcessorTest < Minitest::Test
 
   def test_query
     shipment = TestShipment.new(test_name)
-    processor = Processor.new(shipment.directory)
+    processor = Processor.new(shipment)
     assert_output(/not.yet.run/i) { processor.query }
   end
 
   def test_run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC F .DS_Store')
     options = { no_progress: true }
-    processor = Processor.new(shipment.directory, options)
+    processor = Processor.new(shipment, options)
     capture_io do
       processor.run
     end
@@ -81,6 +81,8 @@ class ProcessorTest < Minitest::Test
     assert_equal(File.size(status_json), 0, 'status.json is unmodified')
   end
 
+  # Don't pass TestShipment to anything we want to serialize --
+  # the initializer isn't JSON-aware
   def test_reload_status_file
     spec = 'BC T bad_16bps 1'
     shipment = TestShipment.new(test_name, spec)
@@ -94,10 +96,9 @@ class ProcessorTest < Minitest::Test
     assert_kind_of Error, errs[0], 'Error class reconstituted from status.json'
   end
 
-  def test_restore_from_source_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    test_shipment = TestShipment.new(test_name, 'BC T contone 1')
-    processor = Processor.new(test_shipment.directory, {})
-    shipment = processor.shipment
+  def test_restore_from_source_directory # rubocop:disable Metrics/MethodLength
+    shipment = TestShipment.new(test_name, 'BC T contone 1')
+    processor = Processor.new(shipment, {})
     capture_io do
       processor.run
     end
@@ -124,14 +125,13 @@ class ProcessorErrorCorrectionTest < Minitest::Test
   # and fixity is updated with the new file.
   def test_error_correction # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     spec = 'BC T contone 1 BC T bad_16bps 1'
-    test_shipment = TestShipment.new(test_name, spec)
-    processor = Processor.new(test_shipment.directory, @options)
-    shipment = processor.shipment
+    shipment = TestShipment.new(test_name, spec)
+    processor = Processor.new(shipment, @options)
     capture_io do
       processor.run
     end
     refute processor.errors.none?, 'error detected'
-    bad_barcode = test_shipment.ordered_barcodes[1]
+    bad_barcode = shipment.ordered_barcodes[1]
     tiff = File.join(bad_barcode, '00000001.tif')
     old_checksum = shipment.checksums[tiff]
     fixture = Fixtures.tiff_fixture('contone')

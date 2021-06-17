@@ -29,6 +29,14 @@ class Shipment # rubocop:disable Metrics/ClassLength
     }.to_json(*args)
   end
 
+  def status_file
+    File.join(@dir, 'status.json')
+  end
+
+  def status_file?
+    File.exist? status_file
+  end
+
   def directory
     @dir
   end
