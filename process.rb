@@ -1,17 +1,19 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'byebug'
+require 'json'
 require 'optparse'
 require 'pathname'
-require 'json'
-require 'byebug'
 require 'yaml'
 
 APP_ROOT = File.expand_path(__dir__)
 $LOAD_PATH << File.join(APP_ROOT, 'lib')
 $LOAD_PATH << File.join(APP_ROOT, 'lib', 'stage')
-require 'string_color'
+
 require 'processor'
+require 'query_tool'
+require 'string_color'
 
 options_data = [['-c', '--config-profile PROFILE', :config_profile,
                  'Configuration PROFILE (e.g., "dlxs")'],
@@ -57,10 +59,13 @@ end
 
 begin
   processor.run
+  tool = QueryTool.new processor
 rescue Interrupt
   puts "\nInterrupted".red
 ensure
-  processor.write_status
+  processor.finalize
+  processor.write_status_file
+  tool.status_cmd
 end
 
 # ARGV.each do |arg|
@@ -80,6 +85,7 @@ end
 #   rescue Interrupt
 #     puts "\nInterrupted".red
 #   ensure
-#     processor.write_status
+#     processor.finalize
+#     processor.write_status_file
 #   end
 # end

@@ -29,7 +29,9 @@ class Processor # rubocop:disable Metrics/ClassLength
     stages
   end
 
-  def run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def run
+    # open3 can be noisy if processing is interrupted with Ctrl-C.
+    # This setting keeps it quiet.
     save_report_on_exception = Thread.report_on_exception
     Thread.report_on_exception = false
     if config[:restart_all] && File.directory?(@shipment.source_directory)
@@ -37,19 +39,29 @@ class Processor # rubocop:disable Metrics/ClassLength
     else
       restore_from_source_directory changed_barcodes
     end
-    stages.each do |stage|
-      run_stage stage
-      break if config[:one_stage] || stage.fatal_error?
-    end
+    run_stages
     Thread.report_on_exception = save_report_on_exception
-    query
     @agenda = nil
   end
 
+  # Remove shipment source directory and status.json if processing has finished.
+  def finalize
+    return unless stages.all?(&:complete?)
+
+    bar = ProgressBar.new('(Finalize)')
+    bar.steps = 1
+    bar.next! 'removing source directory'
+    shipment.delete_source_directory
+    bar.done!
+    delete_status_file
+  end
+
+  # As with Shipment#restore_from_source_directory, takes nil to replace all,
+  # barcode Array otherwise.
   def restore_from_source_directory(barcodes = nil)
     return if barcodes == []
 
-    bar = ProgressBar.new('Processor')
+    bar = ProgressBar.new('(Restore)')
     bar.steps = @shipment.source_barcode_directories.count
     @shipment.restore_from_source_directory(barcodes) do |barcode|
       bar.next! "copying from source/#{barcode}"
@@ -70,22 +82,6 @@ class Processor # rubocop:disable Metrics/ClassLength
       @stages << stage
     end
     @stages
-  end
-
-  def query # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    stages.each do |stage|
-      print stage.name.bold + ' '
-      if stage.end.nil?
-        puts 'not yet run'
-      elsif stage.fatal_error?
-        puts 'fatal error'.red
-      else
-        bad = stage.error_barcodes
-        puts "#{bad.count}/#{@shipment.barcodes.count} barcodes failed," \
-             " #{stage.errors.count} errors," \
-             " #{stage.warnings.count} warnings"
-      end
-    end
   end
 
   def agenda
@@ -148,7 +144,13 @@ class Processor # rubocop:disable Metrics/ClassLength
     @status_file ||= File.join(@shipment.directory, 'status.json')
   end
 
-  def write_status
+  def status_file_deleted?
+    @status_file_deleted
+  end
+
+  def write_status_file
+    return if @status_file_deleted
+
     puts "Writing status file #{status_file}" if config[:verbose]
     File.open(status_file, 'w') do |f|
       f.write JSON.pretty_generate({ shipment: shipment,
@@ -157,6 +159,20 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   private
+
+  def delete_status_file
+    return unless File.exist? status_file
+
+    FileUtils.rm status_file
+    @status_file_deleted = true
+  end
+
+  def run_stages
+    stages.each do |stage|
+      run_stage stage
+      break if stage.fatal_error?
+    end
+  end
 
   def run_stage(stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     stage_agenda = agenda.for_stage stage

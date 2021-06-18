@@ -95,13 +95,14 @@ begin
       when 'run'
         begin
           processor.run
+          processor.query
         rescue Interrupt
           puts "\nInterrupted".red
         ensure
           processor.write_status
         end
       when 'status'
-        processor.query
+        tool.status_cmd
       when 'warnings'
         tool.warnings_cmd(*args)
       else
