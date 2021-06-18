@@ -66,7 +66,7 @@ class CompressorTest < Minitest::Test
     shipment = TestShipment.new(test_name, 'BC F 00000001.tif')
     stage = Compressor.new(shipment, config: @config)
     stage.run!
-    assert_equal(1, stage.errors.count, 'stage fails with 16bps TIFF')
+    assert_equal(1, stage.errors.count, 'stage fails with zero-length TIFF')
   end
 
   def test_alpha_channel

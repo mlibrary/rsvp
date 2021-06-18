@@ -6,6 +6,11 @@ require 'stringio'
 require 'query_tool'
 
 class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+  def setup
+    @options = { config_dir: File.join(TEST_ROOT, 'config'),
+                 no_progress: true }
+  end
+
   def test_new
     shipment = TestShipment.new(test_name)
     processor = Processor.new(shipment.directory)
@@ -15,7 +20,7 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
 
   def test_agenda_cmd # rubocop:disable Metrics/MethodLength
     test_shipment = TestShipment.new(test_name, 'BC T contone 1')
-    processor = Processor.new(test_shipment.directory)
+    processor = Processor.new(test_shipment, @options)
     tool = QueryTool.new(processor)
     out, _err = capture_io do
       tool.agenda_cmd
@@ -29,7 +34,7 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
 
   def test_agenda_cmd_no_agenda
     test_shipment = TestShipment.new(test_name, 'BC T contone 1')
-    processor = Processor.new(test_shipment.directory)
+    processor = Processor.new(test_shipment, @options)
     capture_io do
       processor.run
     end
@@ -41,9 +46,8 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   end
 
   def test_errors_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    test_shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
-    processor = Processor.new(test_shipment.directory, { no_progress: 1 })
-    shipment = processor.shipment
+    shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
+    processor = Processor.new(shipment, @options)
     stage = processor.stages[0]
     tiff1 = File.join(shipment.barcode_directory(shipment.barcodes[0]),
                       '00000001.tif')
@@ -69,9 +73,8 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   end
 
   def test_warnings_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    test_shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
-    processor = Processor.new(test_shipment.directory, { no_progress: 1 })
-    shipment = processor.shipment
+    shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
+    processor = Processor.new(shipment, @options)
     stage = processor.stages[0]
     tiff1 = File.join(shipment.barcode_directory(shipment.barcodes[0]),
                       '00000001.tif')
@@ -96,10 +99,26 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     refute_match shipment.barcodes[1], out, 'no warning for second barcode'
   end
 
+  def test_status_cmd
+    shipment = TestShipment.new(test_name, 'BC T contone 1')
+    processor = Processor.new(shipment, @options)
+    tool = QueryTool.new(processor)
+    assert_output(/not.yet.run/i) { tool.status_cmd }
+  end
+
+  def test_status_cmd_err
+    shipment = TestShipment.new(test_name, 'BC T bad_16bps 1')
+    processor = Processor.new(shipment, @options)
+    capture_io do
+      processor.run
+    end
+    tool = QueryTool.new(processor)
+    assert_output(/1.error/i) { tool.status_cmd }
+  end
+
   def test_fixity_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    test_shipment = TestShipment.new(test_name, 'BC T contone 2-3')
-    processor = Processor.new(test_shipment.directory, { no_progress: 1 })
-    shipment = processor.shipment
+    shipment = TestShipment.new(test_name, 'BC T contone 2-3')
+    processor = Processor.new(shipment, @options)
     shipment.setup_source_directory
     shipment.checksum_source_directory
     barcode = shipment.barcodes[0]

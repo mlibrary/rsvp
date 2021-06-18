@@ -150,7 +150,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   # True if the stage has been run and all possible errors have
   # had a chance to surface
   def complete?
-    !@end.nil?
+    @errors.none? && !@end.nil?
   end
 
   # Expected to be run as part of #run,

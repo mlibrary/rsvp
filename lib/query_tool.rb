@@ -8,7 +8,7 @@ require 'string_color'
 require 'processor'
 
 # Facility for running command-line processor/shipment queries and commands
-class QueryTool
+class QueryTool # rubocop:disable Metrics/ClassLength
   attr_accessor :processor
 
   def initialize(processor)
@@ -72,6 +72,30 @@ class QueryTool
     end
   end
 
+  def status_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    processor.stages.each do |stage|
+      status = ''
+      if stage.end.nil?
+        status = 'not yet run'.italic
+      elsif stage.fatal_error?
+        status = 'fatal error'.red
+      elsif stage.errors.count.zero? && stage.warnings.count.zero?
+        status = 'PASS'.green
+      else
+        total = processor.shipment.barcodes.count
+        status = "#{stage.error_barcodes.count}/#{total}" \
+                 " #{pluralize(total, 'barcode')} failed,"  \
+                 " #{stage.errors.count}" \
+                 " #{pluralize(stage.errors.count, 'error').red}"
+        if stage.warnings.any?
+          status += ", #{stage.warnings.count}" \
+                    " #{pluralize(stage.warnings.count, 'warning').brown}"
+        end
+      end
+      printf "%-28s #{status}\n", stage.name.bold
+    end
+  end
+
   def fixity_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     unless File.directory? processor.shipment.source_directory
       puts 'Source directory not yet populated'
@@ -95,6 +119,18 @@ class QueryTool
       fixity[params[0]].each do |image_file|
         puts "  #{image_file.barcode_file}".italic
       end
+    end
+  end
+
+  private
+
+  def pluralize(count, singular, plural = nil)
+    if count == 1
+      singular
+    elsif plural
+      plural
+    else
+      singular + 's'
     end
   end
 end

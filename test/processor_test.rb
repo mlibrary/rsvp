@@ -5,7 +5,7 @@ require 'minitest/autorun'
 require 'processor'
 require 'fixtures'
 
-class ProcessorTest < Minitest::Test
+class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @options = { config_dir: File.join(TEST_ROOT, 'config') }
     # For testing under Docker, fall back to ImageMagick instead of Kakadu
@@ -22,7 +22,7 @@ class ProcessorTest < Minitest::Test
     refute_nil processor, 'processor successfully created'
     refute File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json not created yet'
-    processor.write_status
+    processor.write_status_file
     assert File.exist?(File.join(shipment.directory, 'status.json')),
            'status.json created'
   end
@@ -52,12 +52,6 @@ class ProcessorTest < Minitest::Test
                    'processor#stages is Array of Stage'
   end
 
-  def test_query
-    shipment = TestShipment.new(test_name)
-    processor = Processor.new(shipment)
-    assert_output(/not.yet.run/i) { processor.query }
-  end
-
   def test_run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC F .DS_Store')
     options = { no_progress: true }
@@ -84,13 +78,12 @@ class ProcessorTest < Minitest::Test
   # Don't pass TestShipment to anything we want to serialize --
   # the initializer isn't JSON-aware
   def test_reload_status_file
-    spec = 'BC T bad_16bps 1'
-    shipment = TestShipment.new(test_name, spec)
+    shipment = TestShipment.new(test_name, 'BC T bad_16bps 1')
     processor = Processor.new(shipment.directory)
     capture_io do
       processor.run
     end
-    processor.write_status
+    processor.write_status_file
     processor = Processor.new(shipment.directory, {})
     errs = processor.errors['TIFF Validator'][shipment.barcodes[0]]
     assert_kind_of Error, errs[0], 'Error class reconstituted from status.json'
@@ -109,6 +102,34 @@ class ProcessorTest < Minitest::Test
       processor.restore_from_source_directory
     end
     assert File.exist?(tiff), '00000001.tif restored from source'
+  end
+
+  def test_finalize # rubocop:disable Metrics/MethodLength
+    shipment = TestShipment.new(test_name, 'BC T contone 1')
+    processor = Processor.new(shipment, @options)
+    capture_io do
+      processor.run
+    end
+    processor.write_status_file
+    capture_io do
+      processor.finalize
+    end
+    refute File.exist?(processor.status_file), 'status.json deleted'
+    refute File.exist?(shipment.source_directory), 'shipment source deleted'
+  end
+
+  def test_finalize_does_nothing # rubocop:disable Metrics/MethodLength
+    shipment = TestShipment.new(test_name, 'BC T bad_16bps 1')
+    processor = Processor.new(shipment, @options)
+    capture_io do
+      processor.run
+    end
+    processor.write_status_file
+    capture_io do
+      processor.finalize
+    end
+    assert File.exist?(processor.status_file), 'status.json left intact'
+    assert File.exist?(shipment.source_directory), 'shipment source left intact'
   end
 end
 
