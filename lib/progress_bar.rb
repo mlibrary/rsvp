@@ -1,14 +1,25 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Single-line CLI ASCII art progress bar
+# Single-line CLI ASCII art progress bar.
+# Can be used in the following ways:
+# [1, 2].each do |n|
+#   bar.next! "doing #{n}" # prints "(0/2) doing 1", "(1/2) doing 2"
+# end
+# bar.done! # prints "(2/2)"
+#
+# OR
+#
+# [1, 2].each_with_index do |n, i|
+#   bar.step! i, "doing #{n}" # prints "(0/2) doing 1", "(1/2) doing 2"
+# end
+# bar.done! # prints "(2/2)"
 class ProgressBar
   attr_accessor :error, :warning, :steps, :done
-  attr_reader :config
 
   def initialize(owner = '')
-    @done = 0
-    @steps = 1
+    @done = nil
+    @steps = 0
     @owner = owner
     @error = false
     @warning = false
@@ -24,11 +35,11 @@ class ProgressBar
   end
 
   def next!(action = '')
-    step! @done + 1, action
+    step! (@done.nil? ? 0 : @done + 1), action
   end
 
   def done?
-    @done >= @steps && @newline
+    (@done || 0) >= @steps && @newline
   end
 
   def done!(action = '')
@@ -40,12 +51,9 @@ class ProgressBar
   def draw(action = '')
     return if @newline
 
-    progress = @steps.zero? ? 10 : 10 * @done / @steps
-    bar = format '%<bar>-10s', bar: segment * progress
-    bar = bar.brown if @warning
-    bar = bar.red if @error
+    progress = @steps.zero? ? 10 : 10 * (@done || 0) / @steps
     printf("\r\033[K%-16s |%s| (#{done}/#{steps}) #{action}",
-           @owner, bar)
+           @owner, bar(progress))
     return unless progress >= 10
 
     puts "\n"
@@ -54,8 +62,12 @@ class ProgressBar
 
   private
 
-  def segment
-    @segment ||= '█'.encode('utf-8')
+  def bar(progress)
+    segment ||= '█'.encode('utf-8')
+    bar = format '%<segments>-10s', segments: segment * progress
+    bar = bar.brown if @warning && !@error
+    bar = bar.red if @error
+    bar
   end
 end
 
