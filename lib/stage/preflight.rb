@@ -22,12 +22,13 @@ class Preflight < Stage
 
   def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     shipment.metadata[:initial_barcodes] = []
+    @bar.steps = steps agenda
+    @bar.next! "validate #{shipment_directory}"
     validate_shipment_directory
     if shipment.metadata[:initial_barcodes].none?
       add_error Error.new("no barcode directories in #{shipment_directory}")
       return
     end
-    @bar.steps = steps(agenda)
     shipment.setup_source_directory do |barcode|
       @bar.next! "setup source/#{barcode}"
     end
@@ -46,9 +47,8 @@ class Preflight < Stage
   private
 
   def steps(agenda)
-    steps = (2 * shipment.barcodes.count) + agenda.count
-    steps += shipment.barcodes.count unless File.directory? source_directory
-    steps
+    1 + shipment.barcodes.count + agenda.count +
+      (File.directory?(source_directory) ? 0 : shipment.barcodes.count)
   end
 
   # A shipment directory is valid if it contains only barcode directories,

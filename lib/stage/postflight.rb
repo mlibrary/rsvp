@@ -9,13 +9,11 @@ require 'stage'
 # Image Metadata Validation Stage
 class Postflight < Stage
   def run(agenda) # rubocop:disable Metrics/MethodLength
-    @bar.steps = steps
+    @bar.steps = steps agenda
     barcode_directories.each do |path|
       barcode = path.split(File::SEPARATOR)[-1]
-      unless agenda.include? barcode
-        @bar.next! "#{barcode} skipped"
-        next
-      end
+      next unless agenda.include? barcode
+
       @bar.next! "validate #{barcode}"
       run_feed_validate_script(barcode)
     end
@@ -27,8 +25,8 @@ class Postflight < Stage
 
   private
 
-  def steps
-    shipment.barcodes.count + 1 +
+  def steps(agenda)
+    agenda.count + 2 +
       shipment.source_image_files.count +
       shipment.checksums.keys.count
   end

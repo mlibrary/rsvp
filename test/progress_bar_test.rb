@@ -55,7 +55,11 @@ class ProgressBarTest < Minitest::Test
     capture_io do
       bar.next!
     end
-    assert_equal 1, bar.done, 'bar.next! increments by 1'
+    assert_equal 0, bar.done, 'bar.next! sets progress to 0 initially'
+    capture_io do
+      bar.next!
+    end
+    assert_equal 1, bar.done, 'bar.next! sets progress to 1 subsequently'
   end
 
   def test_done?
