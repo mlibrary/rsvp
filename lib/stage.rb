@@ -69,7 +69,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   def reinitialize!
     @errors = []
     @warnings = []
-    @bar.done = 0
+    @bar.done = nil
   end
 
   def run!(agenda = nil)
