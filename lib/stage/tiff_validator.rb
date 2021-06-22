@@ -19,7 +19,7 @@ class TIFFValidator < Stage
       fields = extract_tiff_fields run_tiffinfo(image_file)
       err = evaluate fields
       unless err.nil?
-        add_error Error.new(err, image_file.barcode, image_file.path)
+        add_error Error.new(err, image_file.barcode, image_file.file)
       end
     end
   end
@@ -36,9 +36,9 @@ class TIFFValidator < Stage
     end
     stderr_str.chomp.split("\n").each do |err|
       if /warning/i.match? err
-        add_warning Error.new(err, image_file.barcode, image_file.path)
+        add_warning Error.new(err, image_file.barcode, image_file.file)
       else
-        add_error Error.new(err, image_file.barcode, image_file.path)
+        add_error Error.new(err, image_file.barcode, image_file.file)
       end
     end
     stdout_str

@@ -63,7 +63,8 @@ class Tagger < Stage
     tagged_path = File.join(tempdir_for_file(image_file), tagged_name)
     tagged = ImageFile.new(image_file.barcode, tagged_path,
                            File.join(image_file.barcode,
-                                     image_file.path + '.tagged'))
+                                     image_file.path + '.tagged'),
+                           image_file.file)
     FileUtils.cp(image_file.path, tagged_path)
     copy_on_success(tagged_path, image_file.path, image_file.barcode)
     tag_artist tagged

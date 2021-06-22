@@ -49,26 +49,22 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
     processor = Processor.new(shipment, @options)
     stage = processor.stages[0]
-    tiff1 = File.join(shipment.barcode_directory(shipment.barcodes[0]),
-                      '00000001.tif')
-    stage.add_error Error.new('err 1', shipment.barcodes[0], tiff1)
-    tiff2 = File.join(shipment.barcode_directory(shipment.barcodes[1]),
-                      '00000001.tif')
-    stage.add_error Error.new('err 2', shipment.barcodes[1], tiff2)
+    stage.add_error Error.new('err 1', shipment.barcodes[0], '00000001.tif')
+    stage.add_error Error.new('err 2', shipment.barcodes[1], '00000002.tif')
     tool = QueryTool.new(processor)
     out, _err = capture_io do
       tool.errors_cmd
     end
-    assert_match tiff1, out, 'reports errors for both files'
+    assert_match '00000001.tif', out, 'reports errors for both files'
     assert_match shipment.barcodes[0], out, 'reports errors for both barcodes'
-    assert_match tiff2, out, 'reports errors for both files'
+    assert_match '00000002.tif', out, 'reports errors for both files'
     assert_match shipment.barcodes[1], out, 'reports errors for both barcodes'
     out, _err = capture_io do
       tool.errors_cmd shipment.barcodes[0]
     end
-    assert_match tiff1, out, 'reports error for first file'
+    assert_match '00000001.tif', out, 'reports error for first file'
     assert_match shipment.barcodes[0], out, 'reports error for first barcode'
-    refute_match tiff2, out, 'no error for second file'
+    refute_match '00000002.tif', out, 'no error for second file'
     refute_match shipment.barcodes[1], out, 'no error for second barcode'
   end
 
@@ -76,26 +72,22 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
     processor = Processor.new(shipment, @options)
     stage = processor.stages[0]
-    tiff1 = File.join(shipment.barcode_directory(shipment.barcodes[0]),
-                      '00000001.tif')
-    stage.add_warning Error.new('err 1', shipment.barcodes[0], tiff1)
-    tiff2 = File.join(shipment.barcode_directory(shipment.barcodes[1]),
-                      '00000001.tif')
-    stage.add_warning Error.new('err 2', shipment.barcodes[1], tiff2)
+    stage.add_warning Error.new('err 1', shipment.barcodes[0], '00000001.tif')
+    stage.add_warning Error.new('err 2', shipment.barcodes[1], '00000002.tif')
     tool = QueryTool.new(processor)
     out, _err = capture_io do
       tool.warnings_cmd
     end
-    assert_match tiff1, out, 'reports warnings for both files'
+    assert_match '00000001.tif', out, 'reports warnings for both files'
     assert_match shipment.barcodes[0], out, 'reports warnings for both barcodes'
-    assert_match tiff2, out, 'reports warnings for both files'
+    assert_match '00000002.tif', out, 'reports warnings for both files'
     assert_match shipment.barcodes[1], out, 'reports warnings for both barcodes'
     out, _err = capture_io do
       tool.warnings_cmd shipment.barcodes[0]
     end
-    assert_match tiff1, out, 'reports warning for first file'
+    assert_match '00000001.tif', out, 'reports warning for first file'
     assert_match shipment.barcodes[0], out, 'reports warning for first barcode'
-    refute_match tiff2, out, 'no warning for second file'
+    refute_match '00000002.tif', out, 'no warning for second file'
     refute_match shipment.barcodes[1], out, 'no warning for second barcode'
   end
 

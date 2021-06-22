@@ -4,7 +4,7 @@
 require 'digest'
 require 'json'
 
-ImageFile = Struct.new(:barcode, :path, :barcode_file)
+ImageFile = Struct.new(:barcode, :path, :barcode_file, :file)
 
 # Shipment directory class
 class Shipment # rubocop:disable Metrics/ClassLength
@@ -95,7 +95,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
       entries.sort.each do |e|
         next unless e.end_with? type
 
-        files << ImageFile.new(b, File.join(barcode_dir, e), File.join(b, e))
+        files << ImageFile.new(b, File.join(barcode_dir, e), File.join(b, e), e)
       end
     end
     files
@@ -110,7 +110,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
       Dir.entries(dir).reject { |e| %w[. ..].include? e }.sort.each do |e|
         next unless e.end_with? type
 
-        files << ImageFile.new(b, File.join(dir, e), File.join(b, e))
+        files << ImageFile.new(b, File.join(dir, e), File.join(b, e), e)
       end
     end
     files
@@ -197,7 +197,8 @@ class Shipment # rubocop:disable Metrics/ClassLength
     checksums.keys.sort.each do |barcode_file|
       image_file = ImageFile.new(barcode_from_path(barcode_file),
                                  File.join(source_directory, barcode_file),
-                                 barcode_file)
+                                 barcode_file,
+                                 barcode_file.split(File::SEPARATOR)[-1])
       yield image_file if block_given?
       fixity[:removed] << image_file unless File.exist? image_file.path
     end
