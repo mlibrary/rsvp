@@ -25,14 +25,12 @@ class AgendaTest < Minitest::Test
                  'first stage has all shipment barcodes'
   end
 
-  def test_update # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def test_update # rubocop:disable Metrics/AbcSize
     shipment = TestShipment.new(test_name, 'BC T contone 1 BC T contone 1')
     processor = Processor.new(shipment.directory, {})
     agenda = Agenda.new processor.shipment, processor.stages
     err = Error.new 'test error', processor.shipment.barcodes[0],
-                    File.join(processor.shipment.directory,
-                              processor.shipment.barcodes[0],
-                              '00000001.tif')
+                    '00000001.tif'
     processor.stages[0].add_error err
     agenda.update processor.stages[0]
     assert_equal processor.shipment.barcodes[1..],

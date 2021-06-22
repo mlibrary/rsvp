@@ -42,7 +42,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         begin
           handle_8_bps_conversion(image_file.path, metadata)
         rescue CompressorError => e
-          add_error Error.new(e.message, image_file.barcode, image_file.path)
+          add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
       when 1
         # It's bitonal, so we G4 compress it.
@@ -50,11 +50,11 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         begin
           handle_1_bps_conversion(image_file.path, metadata)
         rescue CompressorError => e
-          add_error Error.new(e.message, image_file.barcode, image_file.path)
+          add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
       else
         add_error Error.new("invalid source TIFF BPS #{bps}",
-                            image_file.barcode, image_file.path)
+                            image_file.barcode, image_file.file)
       end
     end
   end
@@ -66,14 +66,14 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
       add_error Error.new("'#{cmd}' exit status #{code.exitstatus}",
-                          image_file.barcode, image_file.path)
+                          image_file.barcode, image_file.file)
       return nil
     end
     stderr_str.chomp.split("\n").each do |err|
       if /tag\signored/.match? err
-        add_warning Error.new(err, image_file.barcode, image_file.path)
+        add_warning Error.new(err, image_file.barcode, image_file.file)
       else
-        add_error Error.new(err, image_file.barcode, image_file.path)
+        add_error Error.new(err, image_file.barcode, image_file.file)
         return nil
       end
     end
@@ -254,7 +254,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     match = /Software:\s(.+)/.match metadata
     if match.nil?
       add_warning Error.new('could not extract software',
-                            shipment.barcode_from_path(path), path)
+                            shipment.barcode_from_path(path),
+                            path.split(File::SEPARATOR)[-1])
     else
       write_tiff_software(page1, match[1])
     end

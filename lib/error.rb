@@ -4,9 +4,12 @@
 require 'json'
 
 # Processing error class
+# For readability in error messages and elsewhere,
+# wherever possible @path should be relative.
+# In particular when a barcode is included, @path should just be a filename.
 class Error
   include Comparable
-  attr_reader :barcode, :path, :description
+  attr_reader :description, :barcode, :path
 
   def self.json_create(hash)
     new hash['data']['description'], hash['data']['barcode'],

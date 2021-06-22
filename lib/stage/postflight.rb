@@ -47,13 +47,13 @@ class Postflight < Stage
       @bar.next! image_file.barcode_file
     end
     fixity[:added].each do |image_file|
-      add_error Error.new('SHA missing', image_file.barcode, image_file.path)
+      add_error Error.new('SHA missing', image_file.barcode, image_file.file)
     end
     fixity[:removed].each do |image_file|
-      add_error Error.new('file missing', image_file.barcode, image_file.path)
+      add_error Error.new('file missing', image_file.barcode, image_file.file)
     end
     fixity[:changed].each do |image_file|
-      add_error Error.new('SHA modified', image_file.barcode, image_file.path)
+      add_error Error.new('SHA modified', image_file.barcode, image_file.file)
     end
   end
 
@@ -93,7 +93,6 @@ class Postflight < Stage
     fields = line.split("\t")
     # Extract file if possible, nil if no match
     file = line[/\tfile: (.*?)(\t|$)/, 1]
-    file = File.join(barcode, file) unless file.nil?
     # Remove fields starting with "objid: ", "namespace: ", "remediable: ",
     # "stage: ", and "file: "
     re = /^(objid|namespace|remediable|stage|file): /

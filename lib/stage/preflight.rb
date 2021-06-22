@@ -63,10 +63,10 @@ class Preflight < Stage
       if File.directory? path
         shipment.metadata[:initial_barcodes] << entry
       elsif self.class.removable_files.include? entry
-        add_warning Error.new("#{path} deleted")
+        add_warning Error.new('unnecessary file deleted', nil, path)
         delete_on_success path
       else
-        add_error Error.new("unknown file #{path}")
+        add_error Error.new('unknown file', nil, path)
       end
     end
   end
@@ -85,12 +85,12 @@ class Preflight < Stage
       elsif self.class::TIFF_REGEX.match? entry
         have_tiff = true
       elsif self.class.ignorable_files.include? entry
-        add_warning Error.new('file ignored', barcode, path)
+        add_warning Error.new('file ignored', barcode, entry)
       elsif self.class.removable_files.include? entry
-        add_warning Error.new('file deleted', barcode, path)
+        add_warning Error.new('file deleted', barcode, entry)
         delete_on_success path
       else
-        add_error Error.new('unknown file', barcode, path)
+        add_error Error.new('unknown file', barcode, entry)
       end
     end
     add_error Error.new('no TIFF files found', barcode) unless have_tiff
