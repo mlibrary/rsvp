@@ -39,53 +39,32 @@ options_data.each do |vals|
 end
 opts.parse!
 
-if ARGV.count != 1
+if ARGV.count.zero?
   puts opts.help
   exit 1
 end
 
-dir = Pathname.new(ARGV[0]).realpath.to_s
-unless File.exist?(dir) && File.directory?(dir)
-  puts "Shipment directory #{dir.bold} does not exist".red
-  exit 1
+ARGV.each do |arg|
+  dir = Pathname.new(arg).realpath.to_s
+  unless File.exist?(dir) && File.directory?(dir)
+    puts "Shipment directory #{dir.bold} does not exist, skipping".red
+    next
+  end
+  begin
+    processor = Processor.new(dir, options)
+  rescue JSON::ParserError => e
+    puts "unable to parse #{File.join(dir, status.json)}: #{e}"
+    next
+  end
+  begin
+    puts "Processing #{dir}...".blue
+    processor.run
+    tool = QueryTool.new processor
+  rescue Interrupt
+    puts "\nInterrupted".red
+  ensure
+    processor.finalize
+    processor.write_status_file
+    tool.status_cmd
+  end
 end
-
-begin
-  processor = Processor.new(dir, options)
-rescue JSON::ParserError => e
-  puts "unable to parse #{File.join(dir, status.json)}: #{e}"
-  exit 1
-end
-
-begin
-  processor.run
-  tool = QueryTool.new processor
-rescue Interrupt
-  puts "\nInterrupted".red
-ensure
-  processor.finalize
-  processor.write_status_file
-  tool.status_cmd
-end
-
-# ARGV.each do |arg|
-#   dir = Pathname.new(arg).cleanpath.to_s
-#   unless File.exist?(dir) && File.directory?(dir)
-#     puts "Shipment directory #{dir.bold} does not exist, skipping".red
-#     next
-#   end
-#   begin
-#     processor = Processor.new(dir, options)
-#   rescue JSON::ParserError => e
-#     puts "unable to parse #{File.join(dir, status.json)}: #{e}"
-#     next
-#   end
-#   begin
-#     processor.run
-#   rescue Interrupt
-#     puts "\nInterrupted".red
-#   ensure
-#     processor.finalize
-#     processor.write_status_file
-#   end
-# end
