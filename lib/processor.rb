@@ -14,25 +14,25 @@ require 'stage'
 require 'string_color'
 require 'symbolize'
 
+Dir[File.join(__dir__, 'stage', '*.rb')].sort.each { |file| require file }
+
 # Processor
 class Processor # rubocop:disable Metrics/ClassLength
   attr_reader :dir, :config, :shipment
 
-  # Can take either a directory path or a Shipment
-  def initialize(dir, options = {}) # rubocop:disable Metrics/MethodLength
-    if dir.is_a?(Shipment)
-      @shipment = dir
-      @dir = @shipment.directory
-    else
-      @dir = dir
-      @shipment = Shipment.new(dir)
-    end
+  # Can take a Shipment instead of a directory.
+  # This is mainly as a shortcut for testing and is not otherwise recommended.
+  def initialize(dir, options = {})
+    @dir = dir.is_a?(Shipment) ? dir.directory : dir
     @config = Config.new(options)
-    config[:stages].each do |s|
-      require s[:file]
+    unless init_status_file
+      @shipment = dir.is_a?(Shipment) ? dir : shipment_class.new(dir)
     end
-    init_status_file
     stages
+  end
+
+  def shipment_class
+    Object.const_get(@config[:shipment_class] || 'Shipment')
   end
 
   def run # rubocop:disable Metrics/MethodLength
@@ -81,8 +81,6 @@ class Processor # rubocop:disable Metrics/ClassLength
 
     @stages = []
     config[:stages].each do |s|
-      # The require step is also done when loading from JSON
-      require s[:file]
       stage_class = Object.const_get(s[:class])
       stage = stage_class.new(@shipment, config: config)
       stage.name = s[:name]
@@ -148,7 +146,7 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def status_file
-    @status_file ||= File.join(@shipment.directory, 'status.json')
+    @status_file ||= File.join(@dir, 'status.json')
   end
 
   def status_file?
@@ -158,7 +156,10 @@ class Processor # rubocop:disable Metrics/ClassLength
   def write_status_file
     puts "Writing status file #{status_file}" if config[:verbose]
     File.open(status_file, 'w') do |f|
-      f.write JSON.pretty_generate({ shipment: shipment,
+      config_copy = @config.dup
+      config_copy.delete :restart_all
+      f.write JSON.pretty_generate({ config: config_copy,
+                                     shipment: shipment,
                                      stages: stages })
     end
   end
@@ -174,6 +175,8 @@ class Processor # rubocop:disable Metrics/ClassLength
 
   def run_stage(stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     stage_agenda = agenda.for_stage stage
+    return if stage_agenda.none?
+
     stage.reinitialize!
     print_progress "Running stage #{stage.name} with #{agenda}"
     interrupt = false
@@ -193,7 +196,7 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    return unless File.exist? status_file
+    return false unless File.exist? status_file
 
     # In order to reconstitute Error objects we need to use JSON.load
     # instead of JSON.parse. So we explicitly symbolize the output.
@@ -214,7 +217,13 @@ class Processor # rubocop:disable Metrics/ClassLength
     if config[:restart_all]
       raise FinalizedShipmentError if status[:shipment].finalized?
 
+      false
     else
+      unless status[:config].nil?
+        save_config = @config
+        @config = status[:config]
+        @config.merge! save_config
+      end
       @shipment = status[:shipment]
       @shipment.directory = @dir
       @stages = status[:stages]
@@ -222,6 +231,7 @@ class Processor # rubocop:disable Metrics/ClassLength
         s.shipment = @shipment
         s.config = @config
       end
+      true
     end
   end
 

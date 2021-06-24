@@ -24,16 +24,26 @@ require 'symbolize'
 # should be taken to design configurations that do not require the mere
 # presence of a key to function correctly.
 class Config
+  def self.json_create(hash)
+    new hash['data']
+  end
+
   def initialize(options = {})
     raise 'non-Hash options passed to Config.new' unless options.is_a? Hash
 
     @options = options
     config.merge! Symbolize.symbolize(options)
-    @config.freeze
   end
 
   def to_s
     config.to_s
+  end
+
+  def to_json(*args)
+    {
+      'json_class' => self.class.name,
+      'data' => @config
+    }.to_json(*args)
   end
 
   def config

@@ -40,7 +40,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         # It's a contone, so we convert to JP2.
         @bar.step! i, "#{image_file.barcode_file} JP2"
         begin
-          handle_8_bps_conversion(image_file.path, metadata)
+          handle_8_bps_conversion(image_file, metadata)
         rescue CompressorError => e
           add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
@@ -48,7 +48,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         # It's bitonal, so we G4 compress it.
         @bar.step! i, "#{image_file.barcode_file} G4"
         begin
-          handle_1_bps_conversion(image_file.path, metadata)
+          handle_1_bps_conversion(image_file, metadata)
         rescue CompressorError => e
           add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
@@ -80,16 +80,16 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     stdout_str
   end
 
-  def handle_8_bps_conversion(path, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_8_bps_conversion(image_file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tmpdir = create_tempdir
     sparse = File.join(tmpdir, 'sparse.tif')
     new_image = File.join(tmpdir, 'new.jp2')
-    final_image = File.join(File.dirname(path),
-                            File.basename(path, '.*') + '.jp2')
+    final_image_name = File.basename(image_file.path, '.*') + '.jp2'
+    final_image = File.join(File.dirname(image_file.path), final_image_name)
 
     # We don't want any XMP metadata to be copied over on its own. If
     # it's been a while since we last ran exiftool, this might take a sec.
-    remove_tiff_metadata(path, sparse)
+    remove_tiff_metadata(image_file.path, sparse)
 
     alpha_channel = false
     if /Extra\sSamples:\s1<unassoc-alpha>/.match? metadata
@@ -115,13 +115,13 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # We have our JP2; we can remove the middle TIFF. Then we try
     # to grab metadata from the original TIFF. This should be very
     # quick since we just used exiftool a few lines back.
-    copy_jp2_metadata(path, new_image, final_image, metadata)
+    copy_jp2_metadata(image_file.path, new_image, final_image_name, metadata)
     # If our image had an alpha channel, it'll be gone now, and
     # the XMP data needs to reflect that (previously, we were
     # taking that info from the original image).
     copy_jp2_alphaless_metadata(sparse, new_image) if alpha_channel
-    copy_on_success new_image, final_image, barcode_from_path(path)
-    delete_on_success path, barcode_from_path(path)
+    copy_on_success new_image, final_image, image_file.barcode
+    delete_on_success image_file.path, image_file.barcode
   end
 
   def jp2_clevels(metadata)
@@ -188,7 +188,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     log cmd
   end
 
-  def copy_jp2_metadata(source, destination, final_image, metadata) # rubocop:disable Metrics/MethodLength
+  def copy_jp2_metadata(source, destination, final_image_name, metadata) # rubocop:disable Metrics/MethodLength
     # If the original image has a date, we want it. If not, we
     # want to add the current date.
     # date "%Y-%m-%dT%H:%M:%S"
@@ -198,7 +198,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
                  "-XMP-tiff:DateTime=#{Time.now.strftime('%FT%T')}"
                end
     cmd = "exiftool -tagsFromFile #{source}"                  \
-          " '-XMP-dc:source=#{final_image}'"                  \
+          " '-XMP-dc:source=#{final_image_name}'"             \
           " '-XMP-tiff:Compression=JPEG 2000'"                \
           " '-IFD0:ImageWidth>XMP-tiff:ImageWidth'"           \
           " '-IFD0:ImageHeight>XMP-tiff:ImageHeight'"         \
@@ -218,9 +218,9 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
           " -overwrite_original #{destination}"
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
-      raise CompressorError.new('Could not copy alphaless TIFF metadata',
-                                cmd, stderr_str)
+      raise CompressorError.new('Could not copy TIFF metadata', cmd, stderr_str)
     end
+
     log cmd
   end
 
@@ -239,25 +239,25 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     log cmd
   end
 
-  def handle_1_bps_conversion(path, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_1_bps_conversion(image_file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tmpdir = create_tempdir
-    compressed = File.join(tmpdir, "#{File.basename(path)}-compressed")
-    page1 = File.join(tmpdir, "#{File.basename(path)}-page1")
-    compress_tiff(path, compressed)
-    copy_tiff_metadata(path, compressed)
+    compressed = File.join(tmpdir,
+                           "#{File.basename(image_file.path)}-compressed")
+    page1 = File.join(tmpdir, "#{File.basename(image_file.path)}-page1")
+    compress_tiff(image_file.path, compressed)
+    copy_tiff_metadata(image_file.path, compressed)
     copy_tiff_page1(compressed, page1)
     FileUtils.rm(compressed)
     write_tiff_date_time page1 unless /DateTime:/.match? metadata
-    write_tiff_document_name(path, page1)
+    write_tiff_document_name(image_file, page1)
     match = /Software:\s(.+)/.match metadata
     if match.nil?
-      add_warning Error.new('could not extract software',
-                            shipment.barcode_from_path(path),
-                            path.split(File::SEPARATOR)[-1])
+      add_warning Error.new('could not extract software', image_file.barcode,
+                            image_file.path)
     else
       write_tiff_software(page1, match[1])
     end
-    copy_on_success page1, path, barcode_from_path(path)
+    copy_on_success page1, image_file.path, image_file.barcode
   end
 
   # Try to compress the image. This is the only part of this step
@@ -306,9 +306,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
   end
 
   # Set the document name with barcode/image.tif
-  def write_tiff_document_name(path, destination)
-    docname = barcode_file_from_path path
-    cmd = "tiffset -s 269 '#{docname}' #{destination}"
+  def write_tiff_document_name(image_file, destination)
+    cmd = "tiffset -s 269 '#{image_file.barcode_file}' #{destination}"
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
       raise CompressorError.new('could not set 269 doc name', cmd, stderr_str)

@@ -5,6 +5,71 @@ require 'minitest/autorun'
 require 'pagination_check'
 
 class PaginationCheckTest < Minitest::Test
+  def self.gen_new
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = PaginationCheck.new(shipment, config: opts.merge(@config))
+      refute_nil stage, 'stage successfully created'
+    }
+    generate_tests 'new', test_proc
+  end
+
+  def self.gen_run
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1-5')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = PaginationCheck.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert(stage.errors.none?, 'no errors')
+      assert(stage.warnings.none?, 'no warnings')
+    }
+    generate_tests 'run', test_proc
+  end
+
+  def self.gen_missing # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      spec = 'BC T bitonal 1-2 T bitonal 4-5'
+      test_shipment = test_shipment_class.new(dir, spec)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = PaginationCheck.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert(stage.errors.count == 1, 'one missing page error')
+      assert_equal(stage.errors[0].barcode, shipment.barcodes[0],
+                   'error barcode is shipment barcode')
+      assert_match(/missing/, stage.errors[0].description,
+                   'error contains "missing"')
+    }
+    generate_tests 'missing', test_proc
+  end
+
+  def self.gen_missing_range # rubocop:disable Metrics/AbcSize
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      spec = 'BC T bitonal 1 T bitonal 5'
+      test_shipment = test_shipment_class.new(dir, spec)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = PaginationCheck.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert(stage.errors.count == 1, 'one missing page range error')
+      assert_match(/2-4/, stage.errors[0].description, 'error contains range')
+    }
+    generate_tests 'missing_range', test_proc
+  end
+
+  def self.gen_duplicate # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      spec = 'BC T bitonal 1 J contone 1'
+      test_shipment = test_shipment_class.new(dir, spec)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = PaginationCheck.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert(stage.errors.count == 1, 'one error from duplicate page')
+      assert_match(/duplicate/, stage.errors[0].description,
+                   'error contains "duplicate"')
+    }
+    generate_tests 'duplicate', test_proc
+  end
+
   def setup
     @config = Config.new({ no_progress: true })
   end
@@ -13,45 +78,5 @@ class PaginationCheckTest < Minitest::Test
     TestShipment.remove_test_shipments
   end
 
-  def test_new
-    shipment = TestShipment.new(test_name)
-    stage = PaginationCheck.new(shipment, config: @config)
-    refute_nil stage, 'stage successfully created'
-  end
-
-  def test_run
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1-5')
-    stage = PaginationCheck.new(shipment, config: @config)
-    stage.run!
-    assert(stage.errors.none?, 'no errors')
-    assert(stage.warnings.none?, 'no warnings')
-  end
-
-  def test_missing # rubocop:disable Metrics/AbcSize
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1-2 T bitonal 4-5')
-    stage = PaginationCheck.new(shipment, config: @config)
-    stage.run!
-    assert(stage.errors.count == 1, 'one missing page error')
-    assert_equal(stage.errors[0].barcode, shipment.barcodes[0],
-                 'error barcode is shipment barcode')
-    assert_match(/missing/, stage.errors[0].description,
-                 'error contains "missing"')
-  end
-
-  def test_missing_range
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T bitonal 5')
-    stage = PaginationCheck.new(shipment, config: @config)
-    stage.run!
-    assert(stage.errors.count == 1, 'one missing page range error')
-    assert_match(/2-4/, stage.errors[0].description, 'error contains range')
-  end
-
-  def test_duplicate
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 J contone 1')
-    stage = PaginationCheck.new(shipment, config: @config)
-    stage.run!
-    assert(stage.errors.count == 1, 'one error from duplicate page')
-    assert_match(/duplicate/, stage.errors[0].description,
-                 'error contains "duplicate"')
-  end
+  invoke_gen
 end

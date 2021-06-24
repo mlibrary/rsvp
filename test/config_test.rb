@@ -27,13 +27,6 @@ class ConfigTest < Minitest::Test
                        '#count is a Method'
   end
 
-  def test_frozen
-    config = Config.new(@options)
-    assert_raises RuntimeError do
-      config[:feed_validate_script] = 'fail'
-    end
-  end
-
   def test_options
     config = Config.new(@options)
     assert config.key?(:config_dir), ':config_dir key from options'

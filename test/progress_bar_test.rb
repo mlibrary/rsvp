@@ -5,10 +5,6 @@ require 'minitest/autorun'
 require 'progress_bar'
 
 class ProgressBarTest < Minitest::Test
-  def teardown
-    TestShipment.remove_test_shipments
-  end
-
   def test_new
     bar = ProgressBar.new
     refute_nil bar, 'progress bar successfully created'

@@ -195,7 +195,7 @@ class Stage # rubocop:disable Metrics/ClassLength
     unless File.directory? shipment.tmp_directory
       Dir.mkdir shipment.tmp_directory
     end
-    (@tempdirs ||= []) << Dir.mktmpdir(nil, shipment.tmp_directory)
+    (@tempdirs ||= []) << Dir.mktmpdir(self.class.to_s, shipment.tmp_directory)
     @tempdirs[-1]
   end
 
@@ -211,15 +211,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   end
 
   def barcodes
-    shipment.barcodes
-  end
-
-  def barcode_from_path(path)
-    shipment.barcode_from_path(path)
-  end
-
-  def barcode_file_from_path(path)
-    shipment.barcode_file_from_path(path)
+    @barcodes ||= shipment.barcodes
   end
 
   def log(entry)

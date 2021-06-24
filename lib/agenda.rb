@@ -53,7 +53,7 @@ class Agenda
     @agenda
   end
 
-  # Array of barcodes that have had fixity {added, removed, changed} changes
+  # Set of barcodes that have had fixity {added, removed, changed} changes
   def fixity_changes
     changes = Set.new
     fixity = @shipment.fixity_check

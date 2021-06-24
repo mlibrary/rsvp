@@ -5,7 +5,7 @@ require 'minitest/autorun'
 require 'compressor'
 require 'fixtures'
 
-class CompressorTest < Minitest::Test
+class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @config = Config.new({ no_progress: true })
   end
@@ -14,88 +14,145 @@ class CompressorTest < Minitest::Test
     TestShipment.remove_test_shipments
   end
 
-  def test_new
-    shipment = TestShipment.new(test_name)
-    stage = Compressor.new(shipment, config: @config)
-    refute_nil stage, 'stage successfully created'
+  def self.gen_new
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      refute_nil stage, 'stage successfully created'
+    }
+    generate_tests 'new', test_proc
   end
 
-  def test_run # rubocop:disable Metrics/AbcSize
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    assert_equal(0, stage.errors.count, 'stage runs without errors')
-    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    assert File.exist?(tiff), '00000001.tif exists'
-    jp2 = File.join(shipment.directory, shipment.barcodes[0], '00000002.jp2')
-    assert File.exist?(jp2), '00000002.jp2 exists'
+  def self.gen_run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert_equal(0, stage.errors.count, 'stage runs without errors')
+      tiff = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      assert File.exist?(tiff), '00000001.tif exists'
+      jp2 = File.join(shipment.directory,
+                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      '00000002.jp2')
+      assert File.exist?(jp2), '00000002.jp2 exists'
+    }
+    generate_tests 'run', test_proc
   end
 
-  def test_set_tiff_date_time
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1')
-    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    stage = Compressor.new(shipment, config: @config)
-    stage.send(:write_tiff_date_time, tiff)
-    tiffinfo = `tiffinfo #{tiff}`
-    assert_match(/DateTime:\s\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2}/, tiffinfo,
-                 'TIFF DateTime in %Y:%m:%d %H:%M:%S format')
+  def self.gen_set_tiff_date_time # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      tiff = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.send(:write_tiff_date_time, tiff)
+      tiffinfo = `tiffinfo #{tiff}`
+      assert_match(/DateTime:\s\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2}/, tiffinfo,
+                   'TIFF DateTime in %Y:%m:%d %H:%M:%S format')
+    }
+    generate_tests 'set_tiff_date_time', test_proc
   end
 
-  def test_set_jp2_date_time
-    shipment = TestShipment.new(test_name, 'BC T contone 1')
-    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    `tiffset -s 306 '2000:11:11 11:11:11' #{tiff}`
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    jp2 = File.join(shipment.directory, shipment.barcodes[0], '00000001.jp2')
-    exif_data = `exiftool #{jp2}`
-    assert_match(%r{Date/Time\sModified\s*:\s*2000:11:11\s11:11:11}, exif_data,
-                 'JP2 DateTime in %Y:%m:%d %H:%M:%S format')
+  def self.gen_set_jp2_date_time # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      tiff = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      `tiffset -s 306 '2000:11:11 11:11:11' #{tiff}`
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      jp2 = File.join(shipment.directory,
+                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      '00000001.jp2')
+      exif_data = `exiftool #{jp2}`
+      assert_match(%r{Date/Time\sModified\s*:\s*2000:11:11\s11:11:11},
+                   exif_data, 'JP2 DateTime in %Y:%m:%d %H:%M:%S format')
+    }
+    generate_tests 'set_jp2_date_time', test_proc
   end
 
-  def test_16bps_fails
-    shipment = TestShipment.new(test_name, 'BC T bad_16bps 1')
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    assert_equal(1, stage.errors.count, 'stage fails with 16bps TIFF')
+  def self.gen_16bps_fails
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bad_16bps 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert_equal(1, stage.errors.count, 'stage fails with 16bps TIFF')
+      assert_match(/invalid source tiff/i, stage.errors[0].description,
+                   'stage fails with "invalid source TIFF"')
+    }
+    generate_tests '16bps_fails', test_proc
   end
 
-  def test_zero_length_fails
-    shipment = TestShipment.new(test_name, 'BC F 00000001.tif')
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    assert_equal(1, stage.errors.count, 'stage fails with zero-length TIFF')
+  def self.gen_zero_length_fails
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC F 00000001.tif')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      # Error description may be tiffinfo exit code or something more detailed.
+      assert_equal(1, stage.errors.count, 'stage fails with zero-length TIFF')
+    }
+    generate_tests 'zero_length_fails', test_proc
   end
 
-  def test_alpha_channel
-    shipment = TestShipment.new(test_name, 'BC T contone 1')
-    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    `convert #{tiff} -alpha on #{tiff}`
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    assert_equal(0, stage.errors.count, 'stage runs without errors')
+  def self.gen_alpha_channel # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      tiff = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      `convert #{tiff} -alpha on #{tiff}`
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert_equal(0, stage.errors.count, 'stage runs without errors')
+    }
+    generate_tests 'alpha_channel', test_proc
   end
 
-  def test_icc_profile
-    shipment = TestShipment.new(test_name, 'BC T contone 1')
-    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    profile_path = File.join(Fixtures::TEST_FIXTURES_PATH, 'sRGB2014.icc')
-    `convert #{tiff} -profile #{profile_path} #{tiff}`
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    assert_equal(0, stage.errors.count, 'stage runs without errors')
+  def self.gen_icc_profile # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      tiff = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      profile_path = File.join(Fixtures::TEST_FIXTURES_PATH, 'sRGB2014.icc')
+      `convert #{tiff} -profile #{profile_path} #{tiff}`
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert_equal(0, stage.errors.count, 'stage runs without errors')
+    }
+    generate_tests 'icc_profile', test_proc
   end
 
-  def test_software
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1')
-    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
-    `tiffset -s 305 'BOGUS SOFTWARE v1.0' #{tiff}`
-    stage = Compressor.new(shipment, config: @config)
-    stage.run!
-    assert_equal(0, stage.errors.count, 'stage runs without errors')
-    assert_match(/BOGUS\sSOFTWARE/, `tiffinfo #{tiff}`,
-                 '305 software tag is preserved')
+  def self.gen_software # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      tiff = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      `tiffset -s 305 'BOGUS SOFTWARE v1.0' #{tiff}`
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert_equal(0, stage.errors.count, 'stage runs without errors')
+      assert_match(/BOGUS\sSOFTWARE/, `tiffinfo #{tiff}`,
+                   '305 software tag is preserved')
+    }
+    generate_tests 'software', test_proc
   end
+
+  invoke_gen
 end
 
 class CompressorErrorTest < MiniTest::Test

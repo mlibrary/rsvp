@@ -13,40 +13,61 @@ class StageTest < Minitest::Test
     TestShipment.remove_test_shipments
   end
 
-  def test_new
-    shipment = TestShipment.new(test_name, 'BC')
-    stage = Stage.new(shipment, config: @config)
-    refute_nil stage, 'stage successfully created'
+  def self.gen_new
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Stage.new(shipment, config: @config.merge(opts))
+      refute_nil stage, 'stage successfully created'
+    }
+    generate_tests 'new', test_proc
   end
 
-  def test_run
-    shipment = TestShipment.new(test_name, 'BC')
-    stage = Stage.new(shipment, config: @config)
-    assert_raises(StandardError, 'raises for Stage#run') { stage.run }
+  def self.gen_run
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Stage.new(shipment, config: @config.merge(opts))
+      assert_raises(StandardError, 'raises for Stage#run') { stage.run }
+    }
+    generate_tests 'run', test_proc
   end
 
-  def test_cleanup_tempdirs
-    shipment = TestShipment.new(test_name, 'BC')
-    stage = Stage.new(shipment, config: @config)
-    tempdir = stage.create_tempdir
-    assert File.exist?(tempdir), 'tempdir created'
-    stage.cleanup
-    refute File.exist?(tempdir), 'tempdir deleted by #cleanup'
+  def self.gen_cleanup_tempdirs
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Stage.new(shipment, config: @config.merge(opts))
+      tempdir = stage.create_tempdir
+      assert File.exist?(tempdir), 'tempdir created'
+      stage.cleanup
+      refute File.exist?(tempdir), 'tempdir deleted by #cleanup'
+    }
+    generate_tests 'cleanup_tempdirs', test_proc
   end
 
-  def test_cleanup_delete_on_success
-    shipment = TestShipment.new(test_name, 'BC')
-    stage = Stage.new(shipment, config: @config)
-    temp = File.join(shipment.directory, shipment.barcodes[0], 'temp.txt')
-    FileUtils.touch(temp)
-    stage.delete_on_success temp
-    stage.cleanup
-    refute File.exist?(temp), 'file deleted by #delete_on_success'
+  def self.gen_cleanup_delete_on_success # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Stage.new(shipment, config: @config.merge(opts))
+      temp = File.join(shipment.directory, shipment.barcodes[0], 'temp.txt')
+      FileUtils.touch(temp)
+      stage.delete_on_success temp
+      stage.cleanup
+      refute File.exist?(temp), 'file deleted by #delete_on_success'
+    }
+    generate_tests 'cleanup_delete_on_success', test_proc
   end
 
-  def test_unknown_shipment_class
-    assert_raises(StandardError, 'raises unknown shipment class') do
-      Stage.new('This is a String', config: @config)
-    end
+  def self.gen_unknown_shipment_class
+    test_proc = proc { |_shipment_class, _test_shipment_class, _dir, opts|
+      assert_raises(StandardError, 'raises unknown shipment class') do
+        Stage.new('This is a String', config: @config.merge(opts))
+      end
+    }
+    generate_tests 'unknown_shipment_class', test_proc
   end
+
+  invoke_gen
 end

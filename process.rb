@@ -85,7 +85,6 @@ ARGV.each do |arg| # rubocop:disable Metrics/BlockLength
     puts 'Shipment has been finalized, image masters unavailable'.red
     next
   end
-  puts "FIXME: we'd like to bypass this if we get FinalizedShipmentError"
   processor.write_status_file
   tool = QueryTool.new processor
   tool.status_cmd
