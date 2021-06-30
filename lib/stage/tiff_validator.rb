@@ -16,7 +16,10 @@ class TIFFValidator < Stage
     @bar.steps = files.count
     files.each do |image_file|
       @bar.next! image_file.barcode_file
-      fields = extract_tiff_fields run_tiffinfo(image_file)
+      tiffinfo = run_tiffinfo(image_file)
+      next if tiffinfo.nil?
+
+      fields = extract_tiff_fields tiffinfo
       err = evaluate fields
       unless err.nil?
         add_error Error.new(err, image_file.barcode, image_file.file)
@@ -31,14 +34,16 @@ class TIFFValidator < Stage
     cmd = "tiffinfo #{image_file.path}"
     stdout_str, stderr_str, code = Open3.capture3(cmd)
     if code.exitstatus != 0
-      add_error Error.new("Command '#{cmd}' exited with status #{code}",
+      add_error Error.new("'#{cmd}' exited with status #{code.exitstatus}",
                           image_file.barcode, image_file.path)
+      return nil
     end
     stderr_str.chomp.split("\n").each do |err|
       if /warning/i.match? err
         add_warning Error.new(err, image_file.barcode, image_file.file)
       else
         add_error Error.new(err, image_file.barcode, image_file.file)
+        return nil
       end
     end
     stdout_str
@@ -75,16 +80,18 @@ class TIFFValidator < Stage
   end
 
   # Return Hash with fields xres, yres, res_unit, bps, spp
-  def extract_tiff_fields(info)
+  def extract_tiff_fields(info) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     h = {}
     m = info.match(/Resolution:\s(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)\s+(.*)/)
-    h[:xres] = m[1]
-    h[:yres] = m[2]
-    h[:res_unit] = m[3]
+    unless m.nil?
+      h[:xres] = m[1]
+      h[:yres] = m[2]
+      h[:res_unit] = m[3]
+    end
     m = info.match(%r{Bits/Sample:\s(\d+)})
-    h[:bps] = m[1]
+    h[:bps] = m[1] unless m.nil?
     m = info.match(%r{Samples/Pixel:\s(\d+)})
-    h[:spp] = m[1]
+    h[:spp] = m[1] unless m.nil?
     h
   end
 end
