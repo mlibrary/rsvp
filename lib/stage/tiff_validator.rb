@@ -36,6 +36,7 @@ class TIFFValidator < Stage
     if code.exitstatus != 0
       add_error Error.new("'#{cmd}' exited with status #{code.exitstatus}",
                           image_file.barcode, image_file.path)
+      return nil
     end
     stderr_str.chomp.split("\n").each do |err|
       if /warning/i.match? err
