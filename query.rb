@@ -87,7 +87,7 @@ begin
       when 'errors'
         tool.errors_cmd(*args)
       when 'help', '?'
-        puts command_summary
+        puts COMMAND_SUMMARY
       when 'fixity'
         tool.fixity_cmd
       when 'quit', 'exit'
