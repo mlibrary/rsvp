@@ -89,6 +89,21 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     assert_kind_of Error, errs[0], 'Error class reconstituted from status.json'
   end
 
+  # Don't pass TestShipment to anything we want to serialize --
+  # the initializer isn't JSON-aware
+  def test_move_status_file # rubocop:disable Metrics/AbcSize
+    shipment = TestShipment.new(test_name, 'BC')
+    processor = Processor.new(shipment.directory)
+    processor.write_status_file
+    shipment_copy_dir = File.join(TestShipment::PATH, test_name + '_COPY')
+    FileUtils.copy_entry(shipment.directory, shipment_copy_dir)
+    FileUtils.rm_r(shipment.directory, force: true)
+    processor = Processor.new(shipment_copy_dir)
+    assert_equal 1, processor.shipment.barcodes.count,
+                 'relocated shipment can access its barcodes'
+    FileUtils.rm_r(shipment_copy_dir, force: true)
+  end
+
   def test_restore_from_source_directory # rubocop:disable Metrics/MethodLength
     shipment = TestShipment.new(test_name, 'BC T contone 1')
     processor = Processor.new(shipment, {})
