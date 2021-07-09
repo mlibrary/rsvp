@@ -9,6 +9,8 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @options = { config_dir: File.join(TEST_ROOT, 'config'),
                  no_progress: true }
+    # For testing under Docker, fall back to ImageMagick instead of Kakadu
+    ENV['KAKADONT'] = '1'
   end
 
   def test_new
