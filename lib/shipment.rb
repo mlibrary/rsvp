@@ -41,6 +41,16 @@ class Shipment # rubocop:disable Metrics/ClassLength
     @dir
   end
 
+  # Should only be necessary when loading from a status.json that has moved.
+  # Assign new value and blow away any and all memoized paths.
+  def directory=(dir)
+    return if @dir == dir
+
+    @dir = dir
+    @source_directory = nil
+    @tmp_directory = nil
+  end
+
   def source_directory
     @source_directory ||= File.join @dir, 'source'
   end

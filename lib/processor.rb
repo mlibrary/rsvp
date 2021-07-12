@@ -19,8 +19,14 @@ class Processor # rubocop:disable Metrics/ClassLength
   attr_reader :dir, :config, :shipment
 
   # Can take either a directory path or a Shipment
-  def initialize(dir, options = {})
-    @shipment = dir.is_a?(Shipment) ? dir : Shipment.new(dir)
+  def initialize(dir, options = {}) # rubocop:disable Metrics/MethodLength
+    if dir.is_a?(Shipment)
+      @shipment = dir
+      @dir = @shipment.directory
+    else
+      @dir = dir
+      @shipment = Shipment.new(dir)
+    end
     @config = Config.new(options)
     config[:stages].each do |s|
       require s[:file]
@@ -217,6 +223,7 @@ class Processor # rubocop:disable Metrics/ClassLength
       end
 
       @shipment = status[:shipment]
+      @shipment.directory = @dir
       @stages = status[:stages]
       @stages.each do |s|
         s.shipment = @shipment
