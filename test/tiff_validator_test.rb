@@ -89,4 +89,16 @@ class TIFFValidatorTest < Minitest::Test
     assert(stage.errors.any? { |e| /100x100\scontone/i.match? e.to_s },
            '100x100 contone TIFF rejected')
   end
+
+  def test_garbage_tiff_fails
+    spec = 'BC T contone 1'
+    shipment = TestShipment.new(test_name, spec)
+    stage = TIFFValidator.new(shipment, config: @config)
+    tiff = File.join(shipment.directory, shipment.barcodes[0], '00000001.tif')
+    `/bin/echo -n 'test' > #{tiff}`
+    stage.run!
+    assert(stage.errors.count == 1, 'garbage TIFF generates one error')
+    assert(stage.errors.any? { |e| /cannot read tiff header/i.match? e.to_s },
+           'garbage TIFF rejected with message about TIFF header')
+  end
 end
