@@ -42,9 +42,32 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     end
     tool = QueryTool.new(processor)
     out, _err = capture_io do
-      tool.send :agenda_cmd
+      tool.agenda_cmd
     end
     assert_match(/no agenda/i, out, 'no agenda after completion')
+  end
+
+  def test_barcodes_cmd
+    test_shipment = TestShipment.new(test_name, 'BC T contone 1')
+    processor = Processor.new(test_shipment, @options)
+    tool = QueryTool.new(processor)
+    out, _err = capture_io do
+      tool.barcodes_cmd
+    end
+    assert_match(test_shipment.barcodes[0], out, 'barcode is listed')
+  end
+
+  def test_barcodes_cmd_with_errors
+    test_shipment = TestShipment.new(test_name, 'BC T bad_16bps 1')
+    processor = Processor.new(test_shipment, @options)
+    stage = processor.stages[0]
+    stage.add_error Error.new('err', test_shipment.barcodes[0], '00000001.tif')
+    tool = QueryTool.new(processor)
+    out, _err = capture_io do
+      tool.barcodes_cmd
+    end
+    assert_match("#{test_shipment.barcodes[0]} ERROR", out.decolorize,
+                 'barcode is listed with error')
   end
 
   def test_errors_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -135,5 +158,17 @@ class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
                  out, '00000002.tif changed'
     assert_match "Removed\n  #{File.join(barcode, '00000003.tif')}",
                  out, '00000003.tif removed'
+  end
+
+  def test_fixity_cmd_not_yet_populated
+    shipment = TestShipment.new(test_name, 'BC')
+    processor = Processor.new(shipment, @options)
+    tool = QueryTool.new(processor)
+    out, _err = capture_io do
+      tool.fixity_cmd
+    end
+    out = out.decolorize
+    assert_match 'not yet populated', out,
+                 'warns that source directory is unpopulated'
   end
 end
