@@ -19,6 +19,8 @@ options_data = [['-c', '--config-profile PROFILE', :config_profile,
                  'Configuration PROFILE (e.g., "dlxs")'],
                 ['-d', '--config-dir DIRECTORY', :config_dir,
                  'Configuration directory DIRECTORY'],
+                ['-h', '--help', :help,
+                 'Display this message and exit'],
                 ['-R', '--restart-all', :restart_all,
                  'Discard status.json and restart all stages'],
                 ['-v', '--verbose', :verbose,
@@ -31,15 +33,29 @@ options_data = [['-c', '--config-profile PROFILE', :config_profile,
                  'Set artist tag to ARTIST']].freeze
 options = {}
 opts = OptionParser.new
-opts.banner = "Usage: #{$PROGRAM_NAME} [options] DIR"
+opts.banner = "Usage: #{$PROGRAM_NAME} [options] SHIPMENT_DIRECTORY"
 options_data.each do |vals|
   opts.on(vals[0], vals[1], vals[3]) do |v|
     options[vals[2]] = v
   end
 end
-opts.parse!
 
+begin
+  opts.parse!
+rescue OptionParser::InvalidOption => e
+  puts e.message.capitalize.red
+  puts opts.help
+  exit 1
+end
+
+if options[:help]
+  puts opts.help
+  exit 0
+end
+
+puts "OPTIONS: #{options}"
 if ARGV.count.zero?
+  puts 'Missing required parameter SHIPMENT_DIRECTORY'.red
   puts opts.help
   exit 1
 end
