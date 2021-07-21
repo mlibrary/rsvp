@@ -35,8 +35,11 @@ class QueryTool # rubocop:disable Metrics/ClassLength
   end
 
   def barcodes_cmd
+    errs = processor.errors_by_barcode_by_stage
     processor.shipment.barcodes.each do |b|
-      puts b.bold
+      line = b.bold
+      line += " #{'ERROR'.red}" if errs[b]
+      puts line
     end
   end
 
