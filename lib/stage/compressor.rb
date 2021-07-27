@@ -179,8 +179,6 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
           " 'Cuse_eph=#{JP2_USE_EPH}'" \
           " Cmodes=#{JP2_MODES}" \
           " -no_weights -slope '#{JP2_SLOPE}'"
-    # For testing under Docker, fall back to ImageMagick instead of Kakadu
-    cmd = "convert #{source} #{destination}" if ENV['KAKADONT']
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
       raise CompressorError.new('Could not convert to JPEG 2000',

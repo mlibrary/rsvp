@@ -8,8 +8,6 @@ require 'fixtures'
 class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @options = { config_dir: File.join(TEST_ROOT, 'config') }
-    # For testing under Docker, fall back to ImageMagick instead of Kakadu
-    ENV['KAKADONT'] = '1'
   end
 
   def teardown

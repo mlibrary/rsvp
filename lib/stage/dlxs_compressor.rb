@@ -49,8 +49,6 @@ class DLXSCompressor < Stage
   # Expand existing jp2 into tif in temp directory
   def expand_jp2(src, dest)
     cmd = "kdu_expand -i '#{src}' -o '#{dest}'"
-    # For testing under Docker, fall back to ImageMagick instead of Kakadu
-    cmd = "convert #{src} #{dest}" if ENV['KAKADONT']
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
     unless code.exitstatus.zero?
       raise DLXSCompressorError.new('Could not expand JPEG 2000',
