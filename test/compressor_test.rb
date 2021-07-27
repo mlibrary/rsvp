@@ -7,8 +7,6 @@ require 'fixtures'
 
 class CompressorTest < Minitest::Test
   def setup
-    # For testing under Docker, fall back to ImageMagick instead of Kakadu
-    ENV['KAKADONT'] = '1'
     @config = Config.new({ no_progress: true })
   end
 
