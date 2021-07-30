@@ -36,28 +36,27 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def run
-    # open3 can be noisy if processing is interrupted with Ctrl-C.
-    # This setting keeps it quiet.
-    save_report_on_exception = Thread.report_on_exception
-    Thread.report_on_exception = false
-    if config[:restart_all] && File.directory?(@shipment.source_directory)
+    if config[:restart_all]
       restore_from_source_directory
     else
       restore_from_source_directory changed_barcodes
     end
+    # Keep open3 quiet when processing is interrupted with Ctrl-C.
+    save_report_on_exception = Thread.report_on_exception
+    Thread.report_on_exception = false
     run_stages
     Thread.report_on_exception = save_report_on_exception
     @agenda = nil
   end
 
-  # Remove shipment source directory and status.json if processing has finished.
+  # Remove shipment source directory if processing has finished.
   def finalize
     return unless stages.all?(&:complete?)
 
     bar = ProgressBar.new('(Finalize)')
     bar.steps = 1
-    bar.next! 'removing source directory'
-    shipment.delete_source_directory
+    bar.next! 'finalizing shipment'
+    shipment.finalize
     bar.done!
   end
 
@@ -65,6 +64,7 @@ class Processor # rubocop:disable Metrics/ClassLength
   # barcode Array otherwise.
   def restore_from_source_directory(barcodes = nil)
     return if barcodes == []
+    return unless File.directory? shipment.source_directory
 
     bar = ProgressBar.new('(Restore)')
     bar.steps = @shipment.source_barcode_directories.count
@@ -189,25 +189,26 @@ class Processor # rubocop:disable Metrics/ClassLength
   def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     return unless File.exist? status_file
 
+    # In order to reconstitute Error objects we need to use JSON.load
+    # instead of JSON.parse. So we explicitly symbolize the output.
+    # rubocop:disable Security/JSONLoad
+    status = Symbolize.symbolize JSON.load File.new(status_file)
+    # rubocop:enable Security/JSONLoad
+    raise JSON::ParserError, "unable to parse #{status_file}" if status.nil?
+
+    unless status.key?(:shipment) && status[:shipment].is_a?(Shipment)
+      raise StandardError, 'status.json has no Shipment object'
+    end
+
+    unless status.key?(:stages) && status[:stages].is_a?(Array) &&
+           status[:stages].all? { |s| s.is_a? Stage }
+      raise StandardError, 'status.json has no Stage array'
+    end
+
     if config[:restart_all]
-      File.unlink status_file
+      raise FinalizedShipmentError if status[:shipment].metadata[:finalized]
+
     else
-      # In order to reconstitute Error objects we need to use JSON.load
-      # instead of JSON.parse. So we explicitly symbolize the output.
-      # rubocop:disable Security/JSONLoad
-      status = Symbolize.symbolize JSON.load File.new(status_file)
-      # rubocop:enable Security/JSONLoad
-      raise JSON::ParserError, "unable to parse #{status_file}" if status.nil?
-
-      unless status.key?(:shipment) && status[:shipment].is_a?(Shipment)
-        raise StandardError, 'status.json has no Shipment object'
-      end
-
-      unless status.key?(:stages) && status[:stages].is_a?(Array) &&
-             status[:stages].all? { |s| s.is_a? Stage }
-        raise StandardError, 'status.json has no Stage array'
-      end
-
       @shipment = status[:shipment]
       @shipment.directory = @dir
       @stages = status[:stages]

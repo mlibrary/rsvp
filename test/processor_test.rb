@@ -33,15 +33,6 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
                  'has custom feed validate path')
   end
 
-  def test_unlink_status_on_restart
-    shipment = TestShipment.new(test_name)
-    status_json = File.join(shipment.directory, 'status.json')
-    FileUtils.touch(status_json)
-    options = { restart_all: 1 }
-    Processor.new(shipment.directory, options)
-    refute File.exist?(status_json), 'status.json deleted on reset'
-  end
-
   def test_stages
     shipment = TestShipment.new(test_name)
     processor = Processor.new(shipment)
@@ -143,6 +134,19 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     end
     assert File.exist?(processor.status_file), 'status.json left intact'
     assert File.exist?(shipment.source_directory), 'shipment source left intact'
+  end
+
+  def test_restart_finalized
+    shipment = TestShipment.new(test_name, 'BC T contone 1')
+    processor = Processor.new(shipment.directory, @options)
+    capture_io do
+      processor.run
+      processor.finalize
+    end
+    processor.write_status_file
+    assert_raises(FinalizedShipmentError) do
+      processor = Processor.new(shipment.directory, { restart_all: 1 })
+    end
   end
 end
 
