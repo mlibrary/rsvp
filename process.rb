@@ -53,14 +53,13 @@ if options[:help]
   exit 0
 end
 
-puts "OPTIONS: #{options}"
 if ARGV.count.zero?
   puts 'Missing required parameter SHIPMENT_DIRECTORY'.red
   puts opts.help
   exit 1
 end
 
-ARGV.each do |arg|
+ARGV.each do |arg| # rubocop:disable Metrics/BlockLength
   dir = Pathname.new(arg).realpath.to_s
   unless File.exist?(dir) && File.directory?(dir)
     puts "Shipment directory #{dir.bold} does not exist, skipping".red
@@ -71,16 +70,21 @@ ARGV.each do |arg|
   rescue JSON::ParserError => e
     puts "unable to parse #{File.join(dir, status.json)}: #{e}"
     next
+  rescue FinalizedShipmentError
+    puts 'Shipment has been finalized, image masters unavailable'.red
+    next
   end
   begin
     puts "Processing #{dir}...".blue
     processor.run
-    tool = QueryTool.new processor
   rescue Interrupt
     puts "\nInterrupted".red
+  rescue FinalizedShipmentError
+    puts 'Shipment has been finalized, image masters unavailable'.red
   ensure
     processor.finalize
     processor.write_status_file
+    tool = QueryTool.new processor
     tool.status_cmd
   end
 end

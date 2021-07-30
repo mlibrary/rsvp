@@ -4,6 +4,10 @@
 require 'digest'
 require 'json'
 
+# Errors arising from trying to destructively manipulate a finalized shipment.
+class FinalizedShipmentError < StandardError
+end
+
 ImageFile = Struct.new(:barcode, :path, :barcode_file, :file)
 
 # Shipment directory class
@@ -27,14 +31,6 @@ class Shipment # rubocop:disable Metrics/ClassLength
       'json_class' => self.class.name,
       'data' => { dir: @dir, metadata: @metadata }
     }.to_json(*args)
-  end
-
-  def status_file
-    File.join(@dir, 'status.json')
-  end
-
-  def status_file?
-    File.exist? status_file
   end
 
   def directory
@@ -132,6 +128,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
   # We will potentially remove and re-copy directories from source/
   # but that depends on the options passed to the processor.
   def setup_source_directory
+    raise FinalizedShipmentError if finalized?
     return if File.exist? source_directory
 
     Dir.mkdir File.join(@dir, 'source')
@@ -146,7 +143,8 @@ class Shipment # rubocop:disable Metrics/ClassLength
 
   # Copy clean or remediated barcode directories from source.
   # Called with nil to replaces all barcodes, or an Array of barcodes.
-  def restore_from_source_directory(barcode_array = nil)
+  def restore_from_source_directory(barcode_array = nil) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    raise FinalizedShipmentError if finalized?
     unless File.directory? source_directory
       raise Errno::ENOENT, "source directory #{source_directory} not found"
     end
@@ -160,10 +158,15 @@ class Shipment # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def delete_source_directory
+  def finalize
+    metadata[:finalized] = true
     return unless File.exist? source_directory
 
     FileUtils.rm_r(source_directory, force: true)
+  end
+
+  def finalized?
+    metadata[:finalized] ? true : false
   end
 
   ### === METADATA METHODS === ###

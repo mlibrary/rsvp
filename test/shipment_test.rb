@@ -127,6 +127,19 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     end
   end
 
+  def test_finalize
+    test_shipment = TestShipment.new(test_name, 'BC T contone 1')
+    shipment = Shipment.new(test_shipment.directory)
+    shipment.setup_source_directory
+    shipment.finalize
+    refute File.exist?(shipment.source_directory), 'source directory deleted'
+    assert shipment.metadata[:finalized], 'finalized status recorded'
+    assert shipment.finalized?, 'finalized? returns true'
+    assert_raises(FinalizedShipmentError) do
+      shipment.setup_source_directory
+    end
+  end
+
   def test_fixity_check # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     test_shipment = TestShipment.new(test_name, 'BC T contone 2-3')
     shipment = Shipment.new(test_shipment.directory)
