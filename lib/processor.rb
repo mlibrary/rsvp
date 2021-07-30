@@ -59,7 +59,6 @@ class Processor # rubocop:disable Metrics/ClassLength
     bar.next! 'removing source directory'
     shipment.delete_source_directory
     bar.done!
-    delete_status_file
   end
 
   # As with Shipment#restore_from_source_directory, takes nil to replace all,
@@ -150,13 +149,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     @status_file ||= File.join(@shipment.directory, 'status.json')
   end
 
-  def status_file_deleted?
-    @status_file_deleted
-  end
-
   def write_status_file
-    return if @status_file_deleted
-
     puts "Writing status file #{status_file}" if config[:verbose]
     File.open(status_file, 'w') do |f|
       f.write JSON.pretty_generate({ shipment: shipment,
@@ -165,13 +158,6 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   private
-
-  def delete_status_file
-    return unless File.exist? status_file
-
-    FileUtils.rm status_file
-    @status_file_deleted = true
-  end
 
   def run_stages
     stages.each do |stage|

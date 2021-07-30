@@ -127,7 +127,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     capture_io do
       processor.finalize
     end
-    refute File.exist?(processor.status_file), 'status.json deleted'
+    assert File.exist?(processor.status_file), 'status.json intact'
     refute File.exist?(shipment.source_directory), 'shipment source deleted'
   end
 
