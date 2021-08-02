@@ -58,16 +58,15 @@ ARGV.each do |arg|
     statuses[arg] = 'Not a directory'.red
     next
   end
-  shipment = Shipment.new(dir)
-  if shipment.status_file?
-    begin
-      processor = Processor.new(shipment, options)
-      statuses[arg] = processor.errors.none? ? 'OK'.green : 'ERRORS'.red
-    rescue JSON::ParserError => e
-      statuses[arg] = "Can't parse #{shipment.status_file}: #{e}".red
+  begin
+    processor = Processor.new(dir, options)
+    unless processor.status_file?
+      statuses[arg] = 'Not a shipment'.red
+      next
     end
-  else
-    statuses[arg] = 'Not a shipment'.red
+    statuses[arg] = processor.errors.none? ? 'OK'.green : 'ERRORS'.red
+  rescue JSON::ParserError => e
+    statuses[arg] = "Can't parse #{shipment.status_file}: #{e}".red
   end
 end
 
