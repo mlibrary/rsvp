@@ -5,22 +5,26 @@ require 'luhn'
 require 'fixtures'
 require_relative '../lib/shipment'
 
-class TestShipment < Shipment
+class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
   attr_reader :ordered_barcodes
 
   PATH = File.join(__dir__, 'shipments').freeze
-  @test_shipments = []
+
+  # Yes, we want this shared with subclasses
+  def self.test_shipments
+    @@test_shipments ||= [] # rubocop:disable Style/ClassVars
+  end
 
   def self.remove_test_shipments
-    while @test_shipments.any?
-      dir = File.join(PATH, @test_shipments.pop)
+    while test_shipments.any?
+      dir = File.join(PATH, test_shipments.pop)
       FileUtils.rm_r(dir, force: true)
     end
   end
 
   def self.add_test_shipment(name)
     Dir.mkdir PATH unless File.exist? PATH
-    @test_shipments << name
+    test_shipments << name
   end
 
   # Randomly-generated barcode that passes Luhn check
@@ -125,5 +129,31 @@ class TestShipment < Shipment
     else
       raise StandardError, "Unknown JP2 destination format '#{dest}'"
     end
+  end
+end
+
+class DLXSTestShipment < TestShipment
+  # Randomly-generated DLXS volume/number "barcode" of the form XXXX/YYY
+  def self.generate_barcode(valid = true)
+    barcode = (4.times.map { rand 10 } + ['/'] + 3.times.map { rand 10 }).join
+    valid ? barcode : barcode.reverse
+  end
+
+  def handle_barcode_op
+    barcode = self.class.generate_barcode(true)
+    (volume, number) = barcode.split '/'
+    Dir.mkdir(File.join(@dir, volume))
+    @current_dir = File.join(@dir, volume, number)
+    Dir.mkdir(@current_dir)
+    @ordered_barcodes << barcode
+  end
+
+  def handle_bogus_barcode_op
+    barcode = self.class.generate_barcode(false)
+    (volume, number) = barcode.split '/'
+    Dir.mkdir(File.join(@dir, volume))
+    @current_dir = File.join(@dir, volume, number)
+    Dir.mkdir(@current_dir)
+    @ordered_barcodes << barcode
   end
 end

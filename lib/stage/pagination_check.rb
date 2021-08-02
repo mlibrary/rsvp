@@ -8,9 +8,9 @@ class PaginationCheck < Stage
   IMAGE_FILE_RE = /^([0-9]{8})\.(?:tif|jp2)$/.freeze
 
   def run(agenda)
-    agenda.each do |b|
-      @bar.next! b
-      find_barcode_errors b
+    agenda.each do |barcode|
+      @bar.next! barcode
+      find_barcode_errors barcode
     end
   end
 

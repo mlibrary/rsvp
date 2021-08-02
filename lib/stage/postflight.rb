@@ -8,12 +8,9 @@ require 'stage'
 
 # Image Metadata Validation Stage
 class Postflight < Stage
-  def run(agenda) # rubocop:disable Metrics/MethodLength
+  def run(agenda)
     @bar.steps = steps agenda
-    barcode_directories.each do |path|
-      barcode = path.split(File::SEPARATOR)[-1]
-      next unless agenda.include? barcode
-
+    agenda.each do |barcode|
       @bar.next! "validate #{barcode}"
       run_feed_validate_script(barcode)
     end
@@ -101,6 +98,8 @@ class Postflight < Stage
     # Compact "Invalid value for field, field:" errors
     desc = desc.gsub(/Invalid value for field, field:/i,
                      'invalid value for field')
+    return if redundant_error?(desc, barcode, file)
+
     add_feed_validate_error(desc, barcode, file)
   end
 
@@ -110,10 +109,12 @@ class Postflight < Stage
       add_warning Error.new(desc, barcode, file)
     else
       desc = desc.gsub(/^error - /i, '')
-      unless /file validation failed/i.match?(desc) && !file.nil? &&
-             errors.any? { |e| e.barcode == barcode && e.path == file }
-        add_error Error.new(desc, barcode, file)
-      end
+      add_error Error.new(desc, barcode, file)
     end
+  end
+
+  def redundant_error?(desc, barcode, file)
+    /validation failed/i.match?(desc) && !file.nil? &&
+      errors.any? { |err| err.barcode == barcode && err.path == file }
   end
 end

@@ -15,7 +15,7 @@ class Tagger < Stage
     calculate_tags
     return if errors.count.positive?
 
-    files = image_files.select { |f| agenda.include? f.barcode }
+    files = image_files.select { |file| agenda.include? file.barcode }
     @bar.steps = files.count
     files.each_with_index do |image_file, i|
       @bar.step! i, image_file.barcode_file

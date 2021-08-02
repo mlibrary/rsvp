@@ -14,25 +14,25 @@ require 'stage'
 require 'string_color'
 require 'symbolize'
 
+Dir[File.join(__dir__, 'stage', '*.rb')].sort.each { |file| require file }
+
 # Processor
 class Processor # rubocop:disable Metrics/ClassLength
   attr_reader :dir, :config, :shipment
 
-  # Can take either a directory path or a Shipment
-  def initialize(dir, options = {}) # rubocop:disable Metrics/MethodLength
-    if dir.is_a?(Shipment)
-      @shipment = dir
-      @dir = @shipment.directory
-    else
-      @dir = dir
-      @shipment = Shipment.new(dir)
-    end
+  # Can take a Shipment instead of a directory.
+  # This is mainly as a shortcut for testing and is not otherwise recommended.
+  def initialize(dir, options = {})
+    @dir = dir.is_a?(Shipment) ? dir.directory : dir
     @config = Config.new(options)
-    config[:stages].each do |s|
-      require s[:file]
+    unless init_status_file
+      @shipment = dir.is_a?(Shipment) ? dir : shipment_class.new(dir)
     end
-    init_status_file
     stages
+  end
+
+  def shipment_class
+    Object.const_get(@config[:shipment_class] || 'Shipment')
   end
 
   def run # rubocop:disable Metrics/MethodLength
@@ -80,12 +80,10 @@ class Processor # rubocop:disable Metrics/ClassLength
     return @stages unless @stages.nil?
 
     @stages = []
-    config[:stages].each do |s|
-      # The require step is also done when loading from JSON
-      require s[:file]
-      stage_class = Object.const_get(s[:class])
+    config[:stages].each do |stage_info|
+      stage_class = Object.const_get(stage_info[:class])
       stage = stage_class.new(@shipment, config: config)
-      stage.name = s[:name]
+      stage.name = stage_info[:name]
       @stages << stage
     end
     @stages
@@ -121,12 +119,12 @@ class Processor # rubocop:disable Metrics/ClassLength
   # Does not include barcodes with no errors
   def errors_by_barcode_by_stage
     errs = {}
-    (@shipment.barcodes + [nil]).each do |b|
+    (@shipment.barcodes + [nil]).each do |barcode|
       stages.each do |stage|
-        stage_errs = stage.errors.select { |e| e.barcode == b }
+        stage_errs = stage.errors.select { |err| err.barcode == barcode }
         next if stage_errs.none?
 
-        (errs[b] ||= {})[stage.name] = stage_errs
+        (errs[barcode] ||= {})[stage.name] = stage_errs
       end
     end
     errs
@@ -136,19 +134,19 @@ class Processor # rubocop:disable Metrics/ClassLength
   # Does not include barcodes with no warnings
   def warnings_by_barcode_by_stage
     warnings = {}
-    (@shipment.barcodes + [nil]).each do |b|
+    (@shipment.barcodes + [nil]).each do |barcode|
       stages.each do |stage|
-        stage_warnings = stage.warnings.select { |e| e.barcode == b }
+        stage_warnings = stage.warnings.select { |err| err.barcode == barcode }
         next if stage_warnings.none?
 
-        (warnings[b] ||= {})[stage.name] = stage_warnings
+        (warnings[barcode] ||= {})[stage.name] = stage_warnings
       end
     end
     warnings
   end
 
   def status_file
-    @status_file ||= File.join(@shipment.directory, 'status.json')
+    @status_file ||= File.join(@dir, 'status.json')
   end
 
   def status_file?
@@ -157,9 +155,12 @@ class Processor # rubocop:disable Metrics/ClassLength
 
   def write_status_file
     puts "Writing status file #{status_file}" if config[:verbose]
-    File.open(status_file, 'w') do |f|
-      f.write JSON.pretty_generate({ shipment: shipment,
-                                     stages: stages })
+    File.open(status_file, 'w') do |file|
+      config_copy = @config.dup
+      config_copy.delete :restart_all
+      file.write JSON.pretty_generate({ config: config_copy,
+                                        shipment: shipment,
+                                        stages: stages })
     end
   end
 
@@ -174,6 +175,8 @@ class Processor # rubocop:disable Metrics/ClassLength
 
   def run_stage(stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     stage_agenda = agenda.for_stage stage
+    return if stage_agenda.none?
+
     stage.reinitialize!
     print_progress "Running stage #{stage.name} with #{agenda}"
     interrupt = false
@@ -193,7 +196,7 @@ class Processor # rubocop:disable Metrics/ClassLength
   end
 
   def init_status_file # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    return unless File.exist? status_file
+    return false unless File.exist? status_file
 
     # In order to reconstitute Error objects we need to use JSON.load
     # instead of JSON.parse. So we explicitly symbolize the output.
@@ -207,21 +210,28 @@ class Processor # rubocop:disable Metrics/ClassLength
     end
 
     unless status.key?(:stages) && status[:stages].is_a?(Array) &&
-           status[:stages].all? { |s| s.is_a? Stage }
+           status[:stages].all? { |stage| stage.is_a? Stage }
       raise StandardError, 'status.json has no Stage array'
     end
 
     if config[:restart_all]
       raise FinalizedShipmentError if status[:shipment].finalized?
 
+      false
     else
+      unless status[:config].nil?
+        save_config = @config
+        @config = status[:config]
+        @config.merge! save_config
+      end
       @shipment = status[:shipment]
       @shipment.directory = @dir
       @stages = status[:stages]
-      @stages.each do |s|
-        s.shipment = @shipment
-        s.config = @config
+      @stages.each do |stage|
+        stage.shipment = @shipment
+        stage.config = @config
       end
+      true
     end
   end
 

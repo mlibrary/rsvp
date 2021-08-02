@@ -27,9 +27,9 @@ class TestShipmentTest < Minitest::Test
     shipment = TestShipment.new(test_name, 'BC')
     assert_equal 1, shipment.barcodes.count, 'correct number of barcodes'
     assert File.directory?(shipment.directory), "#{test_name} is directory"
-    assert File.directory?(File.join(shipment.directory,
-                                     shipment.barcodes[0])),
-           "#{shipment.barcodes[0]} is directory"
+    barcode_dir = File.join(shipment.directory,
+                            shipment.barcode_to_path(shipment.barcodes[0]))
+    assert File.directory?(barcode_dir), "#{shipment.barcodes[0]} is directory"
     assert Luhn.valid?(shipment.barcodes[0]),
            "barcode #{shipment.barcodes[0]} valid"
   end
@@ -100,5 +100,18 @@ class TestShipmentTest < Minitest::Test
     assert_raises(StandardError, 'raises unknown jp2 format') do
       TestShipment.new(test_name, 'BC J contone ZZZZZ')
     end
+  end
+end
+
+class DLXSTestShipmentTest < Minitest::Test
+  def test_generate_test_shipment_dlxs_barcode
+    shipment = DLXSTestShipment.new(test_name, 'BC')
+    assert_equal 1, shipment.ordered_barcodes.count,
+                 'correct number of ordered barcodes'
+    (vol, num) = shipment.ordered_barcodes[0].split '/'
+    assert File.directory?(File.join(shipment.directory, vol)),
+           'shipment/volume is directory'
+    assert File.directory?(File.join(shipment.directory, vol, num)),
+           'shipment/volume/number is directory'
   end
 end

@@ -21,14 +21,13 @@ class Preflight < Stage
   end
 
   def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    shipment.metadata[:initial_barcodes] = []
-    @bar.steps = steps agenda
-    @bar.next! "validate #{shipment_directory}"
-    validate_shipment_directory
+    shipment.metadata[:initial_barcodes] = shipment.barcodes
     if shipment.metadata[:initial_barcodes].none?
-      add_error Error.new("no barcode directories in #{shipment_directory}")
-      return
+      add_error Error.new("no barcodes in #{shipment_directory}")
     end
+    @bar.steps = steps agenda
+    @bar.next! "validate #{File.split(shipment_directory)[-1]}"
+    validate_shipment_directory
     shipment.setup_source_directory do |barcode|
       @bar.next! "setup source/#{barcode}"
     end
@@ -36,9 +35,8 @@ class Preflight < Stage
       @bar.next! "checksum source/#{barcode}"
     end
     agenda.each do |barcode|
-      unless Luhn.valid? barcode
-        add_warning Error.new('Luhn checksum failed', barcode)
-      end
+      err = shipment.validate_barcode barcode
+      add_warning Error.new(err, barcode) unless err.nil?
       @bar.next! "validate #{barcode}"
       validate_barcode_directory barcode
     end
@@ -53,16 +51,14 @@ class Preflight < Stage
 
   # A shipment directory is valid if it contains only barcode directories,
   # a source directory, and status.json
-  def validate_shipment_directory # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def validate_shipment_directory # rubocop:disable Metrics/MethodLength
     Dir.entries(shipment_directory).sort.each do |entry|
       next if %w[. .. source tmp status.json].include? entry
 
       path = File.join(shipment_directory, entry)
-      next if entry == 'source' && File.directory?(path)
+      next if File.directory? path
 
-      if File.directory? path
-        shipment.metadata[:initial_barcodes] << entry
-      elsif self.class.removable_files.include? entry
+      if self.class.removable_files.include? entry
         add_warning Error.new('unnecessary file deleted', nil, path)
         delete_on_success path
       else
@@ -76,10 +72,11 @@ class Preflight < Stage
   # No directories are allowed
   def validate_barcode_directory(barcode) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     have_tiff = false
-    Dir.entries(File.join(shipment_directory, barcode)).sort.each do |entry|
+    barcode_directory = shipment.barcode_directory(barcode)
+    Dir.entries(barcode_directory).sort.each do |entry|
       next if %w[. ..].include? entry
 
-      path = File.join(shipment_directory, barcode, entry)
+      path = File.join(barcode_directory, entry)
       if File.directory? path
         add_error Error.new("illegal barcode subdirectory '#{entry}'", barcode)
       elsif self.class::TIFF_REGEX.match? entry

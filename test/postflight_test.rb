@@ -15,127 +15,159 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     TestShipment.remove_test_shipments
   end
 
-  def test_new
-    shipment = TestShipment.new(test_name)
-    stage = Postflight.new(shipment, config: @config)
-    refute_nil stage, 'stage successfully created'
+  def self.gen_new
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      refute_nil stage, 'stage successfully created'
+    }
+    generate_tests 'new', test_proc
   end
 
-  def test_run
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    puts stage.errors
-    assert_equal 0, stage.errors.count, 'stage runs without errors'
+  def self.gen_run # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      spec = 'BC T bitonal 1 T contone 2'
+      test_shipment = test_shipment_class.new(dir, spec)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert_equal 0, stage.errors.count, 'stage runs without errors'
+    }
+    generate_tests 'run', test_proc
   end
 
-  def test_metadata_mismatch_removed
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 BC T bitonal 1')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    FileUtils.rm_r(File.join(shipment.directory, shipment.barcodes[0]),
-                   force: true)
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /removed/.match? e.to_s },
-           'stage gripes about removed barcode'
+  def self.gen_metadata_mismatch_removed # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      spec = 'BC T bitonal 1 BC T bitonal 1'
+      test_shipment = test_shipment_class.new(dir, spec)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      FileUtils.rm_r(File.join(shipment.directory,
+                               shipment.barcode_to_path(shipment.barcodes[0])),
+                     force: true)
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert stage.errors.any? { |e| /removed/.match? e.to_s },
+             'stage gripes about removed barcode'
+    }
+    generate_tests 'metadata_mismatch_removed', test_proc
   end
 
-  def test_metadata_mismatch_added
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 BC T bitonal 1')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    Dir.mkdir File.join(shipment.directory, TestShipment.generate_barcode)
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /added/i.match? e.to_s },
-           'stage gripes about added barcode'
+  def self.gen_metadata_mismatch_added # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      spec = 'BC T bitonal 1 BC T bitonal 1'
+      test_shipment = test_shipment_class.new(dir, spec)
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      new_barcode = test_shipment_class.generate_barcode
+      FileUtils.mkdir_p File.join(shipment.directory,
+                                  shipment.barcode_to_path(new_barcode))
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert stage.errors.any? { |e| /added/i.match? e.to_s },
+             'stage gripes about added barcode'
+    }
+    generate_tests 'metadata_mismatch_added', test_proc
   end
 
-  def test_feed_validate_error # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    ENV['FAKE_FEED_VALIDATE_FAIL'] = File.join(shipment.barcodes[0],
-                                               '00000001.tif')
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /missing field value/i.match? e.to_s },
-           'error(s) from feed validate'
-    assert stage.warnings.any? { |e| /validation failed/i.match? e.to_s },
-           'warning(s) from feed validate'
-    assert stage.errors.none? { |e| /failure!/i.match? e.to_s },
-           'no "failure!" error from feed validate'
-    ENV.delete 'FAKE_FEED_VALIDATE_FAIL'
+  def self.gen_feed_validate_error # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      tiff = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      %w[FAKE_FEED_VALIDATE_FAIL FAKE_NEW_FEED_VALIDATE_FAIL].each do |var|
+        ENV[var] = tiff
+        stage = Postflight.new(shipment, config: opts.merge(@config))
+        stage.run!
+        assert stage.errors.any? { |e| /missing field value/i.match? e.to_s },
+               "error(s) from feed validate with #{var}"
+        assert stage.warnings.any? { |e| /validation failed/i.match? e.to_s },
+               "warning(s) from feed validate with #{var}"
+        assert stage.errors.none? { |e| /failure!/i.match? e.to_s },
+               "no failure!' error from feed validate with #{var}"
+        ENV.delete var
+      end
+    }
+    generate_tests 'feed_validate_error', test_proc
   end
 
-  def test_new_feed_validate_error # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    ENV['FAKE_NEW_FEED_VALIDATE_FAIL'] = File.join(shipment.barcodes[0],
-                                                   '00000001.tif')
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /missing field value/i.match? e.to_s },
-           'error(s) from feed validate'
-    assert stage.warnings.any? { |e| /validation failed/i.match? e.to_s },
-           'warning(s) from feed validate'
-    assert stage.errors.none? { |e| /failure!/i.match? e.to_s },
-           'no "failure!" error from feed validate'
-    ENV.delete 'FAKE_NEW_FEED_VALIDATE_FAIL'
+  def self.gen_feed_validate_crash # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      ENV['FAKE_FEED_VALIDATE_CRASH'] = '1'
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert(stage.errors.any? { |e| /returned 1/i.match? e.to_s },
+             'nonzero feed validate exit status')
+      ENV.delete 'FAKE_FEED_VALIDATE_CRASH'
+    }
+    generate_tests 'feed_validate_crash', test_proc
   end
 
-  def test_feed_validate_crash
-    ENV['FAKE_FEED_VALIDATE_CRASH'] = '1'
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert(stage.errors.any? { |e| /returned 1/i.match? e.to_s },
-           'nonzero feed validate exit status')
-    ENV.delete 'FAKE_FEED_VALIDATE_CRASH'
+  def self.gen_checksum_mismatch # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      tiff = File.join(shipment.source_directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      `echo 'test' > #{tiff}`
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert stage.errors.any? { |e| /SHA modified/i.match? e.to_s },
+             'checksum error generated'
+    }
+    generate_tests 'checksum_mismatch', test_proc
   end
 
-  def test_checksum_mismatch
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    file = File.join(shipment.directory, 'source', shipment.barcodes[0],
-                     '00000001.tif')
-    `echo 'test' > #{file}`
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /SHA modified/i.match? e.to_s },
-           'checksum error generated'
+  def self.gen_file_missing # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      tiff = File.join(shipment.source_directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000001.tif')
+      FileUtils.rm tiff
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert stage.errors.any? { |e| /file missing/i.match? e.to_s },
+             'file missing error generated'
+    }
+    generate_tests 'file_missing', test_proc
   end
 
-  def test_file_missing
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    file = File.join(shipment.directory, 'source', shipment.barcodes[0],
-                     '00000001.tif')
-    FileUtils.rm file
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /file missing/i.match? e.to_s },
-           'file missing error generated'
+  def self.gen_file_added # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Preflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      tiff = File.join(shipment.source_directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       '00000003.tif')
+      `echo 'test' > #{tiff}`
+      stage = Postflight.new(shipment, config: opts.merge(@config))
+      stage.run!
+      assert stage.errors.any? { |e| /SHA missing/i.match? e.to_s },
+             'SHA missing error generated'
+    }
+    generate_tests 'file_added', test_proc
   end
 
-  def test_file_added
-    shipment = TestShipment.new(test_name, 'BC T bitonal 1 T contone 2')
-    stage = Preflight.new(shipment, config: @config)
-    stage.run!
-    file = File.join(shipment.directory, 'source', shipment.barcodes[0],
-                     '00000003.tif')
-    `echo 'test' > #{file}`
-    stage = Postflight.new(shipment, config: @config)
-    stage.run!
-    assert stage.errors.any? { |e| /SHA missing/i.match? e.to_s },
-           'SHA missing error generated'
-  end
+  invoke_gen
 end

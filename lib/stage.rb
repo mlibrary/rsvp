@@ -132,11 +132,11 @@ class Stage # rubocop:disable Metrics/ClassLength
   end
 
   def delete_errors_for_barcode(barcode)
-    @errors.delete_if { |e| e.barcode == barcode }
+    @errors.delete_if { |err| err.barcode == barcode }
   end
 
   def delete_warnings_for_barcode(barcode)
-    @warnings.delete_if { |w| w.barcode == barcode }
+    @warnings.delete_if { |err| err.barcode == barcode }
   end
 
   # OK to make destructive changes to the shipment for this barcode?
@@ -144,7 +144,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   def make_changes?(barcode = nil)
     return @errors.none? if barcode.nil?
 
-    @errors.none? { |e| e.barcode == barcode || e.barcode.nil? }
+    @errors.none? { |err| e.barcode == barcode || err.barcode.nil? }
   end
 
   # True if the stage has been run and all possible errors have
@@ -195,7 +195,7 @@ class Stage # rubocop:disable Metrics/ClassLength
     unless File.directory? shipment.tmp_directory
       Dir.mkdir shipment.tmp_directory
     end
-    (@tempdirs ||= []) << Dir.mktmpdir(nil, shipment.tmp_directory)
+    (@tempdirs ||= []) << Dir.mktmpdir(self.class.to_s, shipment.tmp_directory)
     @tempdirs[-1]
   end
 
@@ -211,15 +211,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   end
 
   def barcodes
-    shipment.barcodes
-  end
-
-  def barcode_from_path(path)
-    shipment.barcode_from_path(path)
-  end
-
-  def barcode_file_from_path(path)
-    shipment.barcode_file_from_path(path)
+    @barcodes ||= shipment.barcodes
   end
 
   def log(entry)
