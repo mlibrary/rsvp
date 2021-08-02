@@ -77,14 +77,16 @@ ARGV.each do |arg| # rubocop:disable Metrics/BlockLength
   begin
     puts "Processing #{dir}...".blue
     processor.run
+    processor.finalize
   rescue Interrupt
     puts "\nInterrupted".red
+    next
   rescue FinalizedShipmentError
     puts 'Shipment has been finalized, image masters unavailable'.red
-  ensure
-    processor.finalize
-    processor.write_status_file
-    tool = QueryTool.new processor
-    tool.status_cmd
+    next
   end
+  puts "FIXME: we'd like to bypass this if we get FinalizedShipmentError"
+  processor.write_status_file
+  tool = QueryTool.new processor
+  tool.status_cmd
 end

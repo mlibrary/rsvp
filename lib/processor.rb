@@ -35,7 +35,9 @@ class Processor # rubocop:disable Metrics/ClassLength
     stages
   end
 
-  def run
+  def run # rubocop:disable Metrics/MethodLength
+    raise FinalizedShipmentError if shipment.finalized?
+
     if config[:restart_all]
       restore_from_source_directory
     else
@@ -149,6 +151,10 @@ class Processor # rubocop:disable Metrics/ClassLength
     @status_file ||= File.join(@shipment.directory, 'status.json')
   end
 
+  def status_file?
+    File.exist? status_file
+  end
+
   def write_status_file
     puts "Writing status file #{status_file}" if config[:verbose]
     File.open(status_file, 'w') do |f|
@@ -206,7 +212,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     end
 
     if config[:restart_all]
-      raise FinalizedShipmentError if status[:shipment].metadata[:finalized]
+      raise FinalizedShipmentError if status[:shipment].finalized?
 
     else
       @shipment = status[:shipment]
