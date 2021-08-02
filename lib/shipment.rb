@@ -244,21 +244,6 @@ class Shipment # rubocop:disable Metrics/ClassLength
 
   private
 
-  def find_barcodes_old(directory = @dir) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    bars = []
-    Dir.glob(File.join(directory, '**/')).each do |dir|
-      dir = dir.sub(%r{/$}, '')
-      dir = dir.sub(%r{^#{Regexp.escape(directory)}/?}, '')
-      next if dir == '' || /^source/.match?(dir) || /^tmp/.match?(dir)
-
-      components = File.split(dir).reject { |c| c == '.' }
-      if components.count == number_of_path_components
-        bars << barcode_from_path_components(components)
-      end
-    end
-    bars.sort
-  end
-
   # Traverse to a depth of number_of_path_components under shipment directory
   def find_barcodes(dir = @dir)
     bars = []
