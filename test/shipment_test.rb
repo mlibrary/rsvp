@@ -36,8 +36,8 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC')
       shipment = shipment_class.new(test_shipment.directory)
       components = shipment.barcode_to_path(shipment.barcodes[0])
-      assert_equal components.count, shipment.number_of_path_components,
-                   'barcode path component count = #number_of_path_components'
+      assert_equal components.count, shipment_class::PATH_COMPONENTS,
+                   'barcode path component count = PATH_COMPONENTS'
       path = [shipment.directory]
       while (component = components.shift)
         path << component

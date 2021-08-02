@@ -13,6 +13,7 @@ ImageFile = Struct.new(:barcode, :path, :barcode_file, :file)
 
 # Shipment directory class
 class Shipment # rubocop:disable Metrics/ClassLength
+  PATH_COMPONENTS = 1
   attr_reader :metadata
 
   def self.json_create(hash)
@@ -77,14 +78,10 @@ class Shipment # rubocop:disable Metrics/ClassLength
     @tmp_directory ||= File.join @dir, 'tmp'
   end
 
-  def number_of_path_components
-    1
-  end
-
   def path_to_barcode(path_components)
-    if path_components.count != number_of_path_components
+    if path_components.count != self.class::PATH_COMPONENTS
       raise "WARNING: #{self.class} is not designed for path components" \
-            " other than #{number_of_path_components} (#{path_components})"
+            " other than #{self.class::PATH_COMPONENTS} (#{path_components})"
     end
 
     path_components.join '/'
@@ -244,7 +241,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
 
   private
 
-  # Traverse to a depth of number_of_path_components under shipment directory
+  # Traverse to a depth of PATH_COMPONENTS under shipment directory
   def find_barcodes(dir = @dir)
     bars = []
     dirs = self.class.top_level_directory_entries(dir)
@@ -256,13 +253,13 @@ class Shipment # rubocop:disable Metrics/ClassLength
 
   def find_barcodes_with_components(dir, components) # rubocop:disable Metrics/MethodLength
     bars = []
-    if components.count < number_of_path_components
+    if components.count < self.class::PATH_COMPONENTS
       subdir = File.join(dir, components)
       self.class.subdirectories(subdir).each do |entry|
         more_bars = find_barcodes_with_components(dir, components + [entry])
         bars = (bars + more_bars).uniq
       end
-    elsif components.count == number_of_path_components
+    elsif components.count == self.class::PATH_COMPONENTS
       bars << path_to_barcode(components)
     end
     bars
@@ -271,21 +268,9 @@ end
 
 # Shipment directory class for DLXS nested volume/number directories
 class DLXSShipment < Shipment
+  PATH_COMPONENTS = 2
   def initialize(dir, metadata = nil)
     super dir, metadata
-  end
-
-  def number_of_path_components
-    2
-  end
-
-  def path_to_barcode(path_components)
-    if path_components.count != number_of_path_components
-      raise "WARNING: #{self.class} is not designed for more or less than" \
-            " #{number_of_path_components} path components (#{path_components})"
-    end
-
-    path_components.join '/'
   end
 
   def barcode_to_path(barcode)
