@@ -80,10 +80,10 @@ class Processor # rubocop:disable Metrics/ClassLength
     return @stages unless @stages.nil?
 
     @stages = []
-    config[:stages].each do |s|
-      stage_class = Object.const_get(s[:class])
+    config[:stages].each do |stage_info|
+      stage_class = Object.const_get(stage_info[:class])
       stage = stage_class.new(@shipment, config: config)
-      stage.name = s[:name]
+      stage.name = stage_info[:name]
       @stages << stage
     end
     @stages
@@ -119,12 +119,12 @@ class Processor # rubocop:disable Metrics/ClassLength
   # Does not include barcodes with no errors
   def errors_by_barcode_by_stage
     errs = {}
-    (@shipment.barcodes + [nil]).each do |b|
+    (@shipment.barcodes + [nil]).each do |barcode|
       stages.each do |stage|
-        stage_errs = stage.errors.select { |e| e.barcode == b }
+        stage_errs = stage.errors.select { |err| err.barcode == barcode }
         next if stage_errs.none?
 
-        (errs[b] ||= {})[stage.name] = stage_errs
+        (errs[barcode] ||= {})[stage.name] = stage_errs
       end
     end
     errs
@@ -134,12 +134,12 @@ class Processor # rubocop:disable Metrics/ClassLength
   # Does not include barcodes with no warnings
   def warnings_by_barcode_by_stage
     warnings = {}
-    (@shipment.barcodes + [nil]).each do |b|
+    (@shipment.barcodes + [nil]).each do |barcode|
       stages.each do |stage|
-        stage_warnings = stage.warnings.select { |e| e.barcode == b }
+        stage_warnings = stage.warnings.select { |err| err.barcode == barcode }
         next if stage_warnings.none?
 
-        (warnings[b] ||= {})[stage.name] = stage_warnings
+        (warnings[barcode] ||= {})[stage.name] = stage_warnings
       end
     end
     warnings
@@ -155,12 +155,12 @@ class Processor # rubocop:disable Metrics/ClassLength
 
   def write_status_file
     puts "Writing status file #{status_file}" if config[:verbose]
-    File.open(status_file, 'w') do |f|
+    File.open(status_file, 'w') do |file|
       config_copy = @config.dup
       config_copy.delete :restart_all
-      f.write JSON.pretty_generate({ config: config_copy,
-                                     shipment: shipment,
-                                     stages: stages })
+      file.write JSON.pretty_generate({ config: config_copy,
+                                        shipment: shipment,
+                                        stages: stages })
     end
   end
 
@@ -210,7 +210,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     end
 
     unless status.key?(:stages) && status[:stages].is_a?(Array) &&
-           status[:stages].all? { |s| s.is_a? Stage }
+           status[:stages].all? { |stage| stage.is_a? Stage }
       raise StandardError, 'status.json has no Stage array'
     end
 
@@ -227,9 +227,9 @@ class Processor # rubocop:disable Metrics/ClassLength
       @shipment = status[:shipment]
       @shipment.directory = @dir
       @stages = status[:stages]
-      @stages.each do |s|
-        s.shipment = @shipment
-        s.config = @config
+      @stages.each do |stage|
+        stage.shipment = @shipment
+        stage.config = @config
       end
       true
     end

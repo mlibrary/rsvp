@@ -15,15 +15,17 @@ class Agenda
   end
 
   # Propagate stage errors onto subsequent stages.
-  def update(stage) # rubocop:disable Metrics/AbcSize
-    @stages.each do |s|
-      next if @stage_to_index[s.name.to_sym] <=
-              @stage_to_index[stage.name.to_sym]
+  def update(source_stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    @stages.each do |stage|
+      next if @stage_to_index[stage.name.to_sym] <=
+              @stage_to_index[source_stage.name.to_sym]
 
-      if stage.fatal_error?
-        agenda[s.name.to_sym] = []
+      if source_stage.fatal_error?
+        agenda[stage.name.to_sym] = []
       else
-        agenda[s.name.to_sym].delete_if { |b| stage.error_barcodes.include? b }
+        agenda[stage.name.to_sym].delete_if do |barcode|
+          source_stage.error_barcodes.include? barcode
+        end
       end
     end
   end

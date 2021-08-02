@@ -20,22 +20,22 @@ class Shipment # rubocop:disable Metrics/ClassLength
   end
 
   def self.top_level_directory_entries(dir)
-    Dir.entries(dir).reject do |e|
-      %w[. .. source tmp].include?(e) ||
-        !File.directory?(File.join(dir, e))
+    Dir.entries(dir).reject do |entry|
+      %w[. .. source tmp].include?(entry) ||
+        !File.directory?(File.join(dir, entry))
     end
   end
 
   def self.directory_entries(dir)
-    Dir.entries(dir).reject do |e|
-      %w[. ..].include?(e)
+    Dir.entries(dir).reject do |entry|
+      %w[. ..].include?(entry)
     end
   end
 
   def self.subdirectories(dir)
-    Dir.entries(dir).reject do |e|
-      %w[. ..].include?(e) ||
-        !File.directory?(File.join(dir, e))
+    Dir.entries(dir).reject do |entry|
+      %w[. ..].include?(entry) ||
+        !File.directory?(File.join(dir, entry))
     end
   end
 
@@ -95,7 +95,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
   end
 
   def barcode_directories
-    barcodes.map { |b| barcode_directory b }
+    barcodes.map { |barcode| barcode_directory barcode }
   end
 
   def barcodes
@@ -107,7 +107,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
   end
 
   def source_barcode_directories
-    source_barcodes.map { |b| File.join(@dir, b) }
+    source_barcodes.map { |barcode| File.join(@dir, barcode) }
   end
 
   def source_barcodes
@@ -125,14 +125,14 @@ class Shipment # rubocop:disable Metrics/ClassLength
 
   def image_files(type = 'tif', dir = @dir) # rubocop:disable Metrics/MethodLength
     files = []
-    find_barcodes(dir).each do |b|
-      barcode_path = barcode_to_path b
+    find_barcodes(dir).each do |barcode|
+      barcode_path = barcode_to_path barcode
       barcode_dir = File.join(dir, barcode_path)
-      self.class.directory_entries(barcode_dir).sort.each do |e|
-        next unless e.end_with? type
+      self.class.directory_entries(barcode_dir).sort.each do |entry|
+        next unless entry.end_with? type
 
-        files << ImageFile.new(b, File.join(barcode_dir, e),
-                               File.join(barcode_path, e), e)
+        files << ImageFile.new(barcode, File.join(barcode_dir, entry),
+                               File.join(barcode_path, entry), entry)
       end
     end
     files
@@ -248,8 +248,8 @@ class Shipment # rubocop:disable Metrics/ClassLength
   def find_barcodes(dir = @dir)
     bars = []
     dirs = self.class.top_level_directory_entries(dir)
-    dirs.each do |e|
-      bars = (bars + find_barcodes_with_components(dir, [e])).uniq
+    dirs.each do |entry|
+      bars = (bars + find_barcodes_with_components(dir, [entry])).uniq
     end
     bars.sort
   end
@@ -258,8 +258,8 @@ class Shipment # rubocop:disable Metrics/ClassLength
     bars = []
     if components.count < number_of_path_components
       subdir = File.join(dir, components)
-      self.class.subdirectories(subdir).each do |e|
-        more_bars = find_barcodes_with_components(dir, components + [e])
+      self.class.subdirectories(subdir).each do |entry|
+        more_bars = find_barcodes_with_components(dir, components + [entry])
         bars = (bars + more_bars).uniq
       end
     elsif components.count == number_of_path_components

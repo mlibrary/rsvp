@@ -115,6 +115,6 @@ class Postflight < Stage
 
   def redundant_error?(desc, barcode, file)
     /validation failed/i.match?(desc) && !file.nil? &&
-      errors.any? { |e| e.barcode == barcode && e.path == file }
+      errors.any? { |err| err.barcode == barcode && err.path == file }
   end
 end

@@ -132,11 +132,11 @@ class Stage # rubocop:disable Metrics/ClassLength
   end
 
   def delete_errors_for_barcode(barcode)
-    @errors.delete_if { |e| e.barcode == barcode }
+    @errors.delete_if { |err| err.barcode == barcode }
   end
 
   def delete_warnings_for_barcode(barcode)
-    @warnings.delete_if { |w| w.barcode == barcode }
+    @warnings.delete_if { |err| err.barcode == barcode }
   end
 
   # OK to make destructive changes to the shipment for this barcode?
@@ -144,7 +144,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   def make_changes?(barcode = nil)
     return @errors.none? if barcode.nil?
 
-    @errors.none? { |e| e.barcode == barcode || e.barcode.nil? }
+    @errors.none? { |err| e.barcode == barcode || err.barcode.nil? }
   end
 
   # True if the stage has been run and all possible errors have
