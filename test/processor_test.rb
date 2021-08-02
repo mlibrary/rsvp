@@ -109,7 +109,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC')
       processor = Processor.new(test_shipment.directory, opts.merge(@options))
       processor.write_status_file
-      shipment_copy_dir = dir + '_COPY'
+      shipment_copy_dir = File.join(TEST_ROOT, dir + '_COPY')
       FileUtils.copy_entry(test_shipment.directory, shipment_copy_dir)
       FileUtils.rm_r(test_shipment.directory, force: true)
       processor = Processor.new(shipment_copy_dir, opts.merge(@options))
