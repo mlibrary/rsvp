@@ -12,7 +12,7 @@ University of Michigan DCU.
 
 ### 1. Set up development
 
-The minimum Ruby version is 2.6.
+The minimum Ruby version is 2.7.3.
 
 ```
 $ git clone https://github.com/mlibrary/rsvp.git
