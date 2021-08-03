@@ -135,7 +135,7 @@ end
 class DLXSTestShipment < TestShipment
   # Randomly-generated DLXS id/volume/number "barcode" abcde/XXXX/YYY
   def self.generate_barcode(valid = true)
-    barcode = [[*('a'..'z'),*('0'..'9')].sample(8).join,
+    barcode = [[*('a'..'z'), *('0'..'9')].sample(8).join,
                4.times.map { rand 10 }.join,
                3.times.map { rand 10 }.join].join('/')
     puts "\n#{barcode}" if valid
