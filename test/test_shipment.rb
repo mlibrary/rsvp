@@ -138,7 +138,6 @@ class DLXSTestShipment < TestShipment
     barcode = [[*('a'..'z'), *('0'..'9')].sample(8).join,
                4.times.map { rand 10 }.join,
                3.times.map { rand 10 }.join].join('/')
-    puts "\n#{barcode}" if valid
     valid ? barcode : barcode.reverse
   end
 
