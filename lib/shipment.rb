@@ -266,9 +266,9 @@ class Shipment # rubocop:disable Metrics/ClassLength
   end
 end
 
-# Shipment directory class for DLXS nested volume/number directories
+# Shipment directory class for DLXS nested id/volume/number directories
 class DLXSShipment < Shipment
-  PATH_COMPONENTS = 2
+  PATH_COMPONENTS = 3
   def initialize(dir, metadata = nil)
     super dir, metadata
   end
@@ -279,6 +279,6 @@ class DLXSShipment < Shipment
 
   # Returns an error message or nil
   def validate_barcode(barcode)
-    %r{^\d\d\d\d/\d\d\d$}.match?(barcode) ? nil : 'invalid volume/number'
+    %r{^.*?/\d\d\d\d/\d\d\d$}.match?(barcode) ? nil : 'invalid volume/number'
   end
 end

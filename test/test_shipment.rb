@@ -133,27 +133,36 @@ class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
 end
 
 class DLXSTestShipment < TestShipment
-  # Randomly-generated DLXS volume/number "barcode" of the form XXXX/YYY
+  # Randomly-generated DLXS id/volume/number "barcode" abcde/XXXX/YYY
   def self.generate_barcode(valid = true)
-    barcode = (4.times.map { rand 10 } + ['/'] + 3.times.map { rand 10 }).join
+    barcode = [[*('a'..'z'),*('0'..'9')].sample(8).join,
+               4.times.map { rand 10 }.join,
+               3.times.map { rand 10 }.join].join('/')
+    puts "\n#{barcode}" if valid
     valid ? barcode : barcode.reverse
   end
 
   def handle_barcode_op
     barcode = self.class.generate_barcode(true)
-    (volume, number) = barcode.split '/'
-    Dir.mkdir(File.join(@dir, volume))
-    @current_dir = File.join(@dir, volume, number)
-    Dir.mkdir(@current_dir)
+    components = barcode.split '/'
+    path = @dir
+    components.each do |component|
+      path = File.join(path, component)
+      Dir.mkdir(path)
+    end
+    @current_dir = path
     @ordered_barcodes << barcode
   end
 
   def handle_bogus_barcode_op
     barcode = self.class.generate_barcode(false)
-    (volume, number) = barcode.split '/'
-    Dir.mkdir(File.join(@dir, volume))
-    @current_dir = File.join(@dir, volume, number)
-    Dir.mkdir(@current_dir)
+    components = barcode.split '/'
+    path = @dir
+    components.each do |component|
+      path = File.join(path, component)
+      Dir.mkdir(path)
+    end
+    @current_dir = path
     @ordered_barcodes << barcode
   end
 end
