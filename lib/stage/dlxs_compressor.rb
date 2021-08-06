@@ -32,10 +32,11 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
   private
 
   def handle_conversion(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    tmpdir = create_tempdir
+    basename = File.basename(image_file.path, '.*')
+    tmpdir = create_tempdir basename
     source = File.join(tmpdir, 'source.tif')
     bitonal = File.join(tmpdir, 'bitonal.tif')
-    final_image_name = File.basename(image_file.path, '.*') + '.tif'
+    final_image_name = basename + '.tif'
     final_image = File.join(File.dirname(image_file.path), final_image_name)
     expand_jp2 image_file.path, source
     tiff_to_pgm tmpdir
@@ -53,9 +54,6 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
     cmd = <<~CMD.gsub("\n", ' ')
       exiftool -tagsFromFile #{source}
       '-IFD0:DocumentName=#{source_image}'
-      '-IFD0:ImageWidth<XMP-tiff:ImageWidth'
-      '-IFD0:ImageHeight<XMP-tiff:ImageHeight'
-      '-IFD0:BitsPerSample<XMP-tiff:BitsPerSample'
       '-IFD0:Orientation<XMP-tiff:Orientation'
       '-IFD0:ResolutionUnit<XMP-tiff:ResolutionUnit'
       '-IFD0:Artist<XMP-tiff:Artist'
@@ -63,6 +61,7 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
       '-IFD0:Model<XMP-tiff:Model'
       '-IFD0:Software<XMP-tiff:Software'
       '-IFD0:ModifyDate<XMP-tiff:DateTime'
+      '-IFD0:ImageDescription=extracted from JP2'
        -overwrite_original #{destination}
     CMD
     _stdout_str, stderr_str, code = Open3.capture3(cmd)
