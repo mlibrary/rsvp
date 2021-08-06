@@ -144,7 +144,7 @@ class Stage # rubocop:disable Metrics/ClassLength
   def make_changes?(barcode = nil)
     return @errors.none? if barcode.nil?
 
-    @errors.none? { |err| e.barcode == barcode || err.barcode.nil? }
+    @errors.none? { |err| err.barcode == barcode || err.barcode.nil? }
   end
 
   # True if the stage has been run and all possible errors have
@@ -191,11 +191,13 @@ class Stage # rubocop:disable Metrics/ClassLength
     FileUtils.rm_rf shipment.tmp_directory
   end
 
-  def create_tempdir
+  # Prefix is useful when debugging image processing pipelines.
+  def create_tempdir(prefix = '')
     unless File.directory? shipment.tmp_directory
       Dir.mkdir shipment.tmp_directory
     end
-    (@tempdirs ||= []) << Dir.mktmpdir(self.class.to_s, shipment.tmp_directory)
+    prefix = self.class.to_s + prefix
+    (@tempdirs ||= []) << Dir.mktmpdir(prefix, shipment.tmp_directory)
     @tempdirs[-1]
   end
 
