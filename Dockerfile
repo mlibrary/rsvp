@@ -1,4 +1,4 @@
-FROM ruby:2.7.3
+FROM ruby:2.7.4
 
 RUN apt-get update -yqq && apt-get install -yqq --no-install-recommends \
     libtiff-tools exiftool netpbm
