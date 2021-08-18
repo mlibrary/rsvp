@@ -79,6 +79,24 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     generate_tests 'set_jp2_date_time', test_proc
   end
 
+  def self.gen_set_jp2_document_name # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
+      test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
+      shipment = shipment_class.new(test_shipment.directory)
+      stage = Compressor.new(shipment, config: opts.merge(@config))
+      stage.run!
+      jp2 = File.join(shipment.directory,
+                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      '00000001.jp2')
+      doc_name = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
+                           '00000001.jp2')
+      exif_data = `exiftool #{jp2}`
+      assert_match(/Source\s*:\s*#{Regexp.escape doc_name}/,
+                   exif_data, 'JP2 File Name includes objid')
+    }
+    generate_tests 'set_jp2_document_name', test_proc
+  end
+
   def self.gen_16bps_fails
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T bad_16bps 1')

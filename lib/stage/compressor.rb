@@ -86,6 +86,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     new_image = File.join(tmpdir, 'new.jp2')
     final_image_name = File.basename(image_file.path, '.*') + '.jp2'
     final_image = File.join(File.dirname(image_file.path), final_image_name)
+    document_name = File.join(shipment.barcode_to_path(image_file.barcode),
+                              final_image_name)
 
     # We don't want any XMP metadata to be copied over on its own. If
     # it's been a while since we last ran exiftool, this might take a sec.
@@ -115,7 +117,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # We have our JP2; we can remove the middle TIFF. Then we try
     # to grab metadata from the original TIFF. This should be very
     # quick since we just used exiftool a few lines back.
-    copy_jp2_metadata(image_file.path, new_image, final_image_name, metadata)
+    copy_jp2_metadata(image_file.path, new_image, document_name, metadata)
     # If our image had an alpha channel, it'll be gone now, and
     # the XMP data needs to reflect that (previously, we were
     # taking that info from the original image).
@@ -188,7 +190,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     log cmd
   end
 
-  def copy_jp2_metadata(source, destination, final_image_name, metadata) # rubocop:disable Metrics/MethodLength
+  def copy_jp2_metadata(source, destination, document_name, metadata) # rubocop:disable Metrics/MethodLength
     # If the original image has a date, we want it. If not, we
     # want to add the current date.
     # date "%Y-%m-%dT%H:%M:%S"
@@ -198,7 +200,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
                  "-XMP-tiff:DateTime=#{Time.now.strftime('%FT%T')}"
                end
     cmd = "exiftool -tagsFromFile #{source}"                  \
-          " '-XMP-dc:source=#{final_image_name}'"             \
+          " '-XMP-dc:source=#{document_name}'"                \
           " '-XMP-tiff:Compression=JPEG 2000'"                \
           " '-IFD0:ImageWidth>XMP-tiff:ImageWidth'"           \
           " '-IFD0:ImageHeight>XMP-tiff:ImageHeight'"         \
