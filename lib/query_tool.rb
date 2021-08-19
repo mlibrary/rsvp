@@ -125,8 +125,6 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     end
   end
 
-  private
-
   def pluralize(count, singular, plural = nil)
     if count == 1
       singular
