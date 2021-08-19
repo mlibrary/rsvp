@@ -7,8 +7,9 @@ require 'optparse'
 APP_ROOT = File.expand_path(__dir__)
 $LOAD_PATH << File.join(APP_ROOT, 'lib')
 $LOAD_PATH << File.join(APP_ROOT, 'lib/stage')
-require 'string_color'
 require 'processor'
+require 'query_tool'
+require 'string_color'
 
 options_data = [['-c', '--config-profile PROFILE', :config_profile,
                  'Configuration PROFILE (e.g., "dlxs")'],
@@ -64,7 +65,11 @@ ARGV.each do |arg|
       statuses[arg] = 'Not a shipment'.red
       next
     end
-    statuses[arg] = processor.errors.none? ? 'OK'.green : 'ERRORS'.red
+    tool = QueryTool.new(processor)
+    status = processor.errors.none? ? 'OK'.green : 'ERRORS'.red
+    objects = tool.pluralize processor.shipment.barcodes.count, 'object'
+    status += " (#{processor.shipment.barcodes.count} #{objects})"
+    statuses[arg] = status
   rescue JSON::ParserError => e
     statuses[arg] = "Can't parse #{shipment.status_file}: #{e}".red
   end
