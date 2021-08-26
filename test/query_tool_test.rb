@@ -5,7 +5,7 @@ require 'minitest/autorun'
 require 'stringio'
 require 'query_tool'
 
-class QueryToolTestTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+class QueryToolTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @options = { config_dir: File.join(TEST_ROOT, 'config'),
                  no_progress: true }

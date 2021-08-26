@@ -4,6 +4,8 @@
 require 'digest'
 require 'open3'
 require 'set'
+
+require 'jhove'
 require 'stage'
 
 # Image Metadata Validation Stage
@@ -12,7 +14,7 @@ class Postflight < Stage
     @bar.steps = steps agenda
     agenda.each do |barcode|
       @bar.next! "validate #{barcode}"
-      run_feed_validate_script(barcode)
+      run_jhove barcode
     end
     @bar.next! 'barcode check'
     check_barcode_lists
@@ -54,67 +56,16 @@ class Postflight < Stage
     end
   end
 
-  def feed_validate_script(barcode)
-    script = config[:feed_validate_script]
-    dir = File.join(shipment.directory, barcode)
-    "perl #{script} google mdp #{dir} #{barcode}"
-  end
-
-  def run_feed_validate_script(barcode)
-    cmd = feed_validate_script barcode
-    log "running '#{cmd}'"
-    stdout_str, stderr_str, code = Open3.capture3(cmd)
-    if code.exitstatus.zero?
-      process_feed_validate_output(barcode, stdout_str)
-    else
-      msg = "'#{cmd}' returned #{code.exitstatus}: #{stderr_str}"
-      add_error Error.new(msg, barcode)
+  def run_jhove(barcode)
+    dir = File.join(shipment.directory, shipment.barcode_to_path(barcode))
+    jhove = JHOVE.new(dir, config)
+    begin
+      jhove.run
+    rescue StandardError => e
+      add_error Error.new(e.message, barcode)
     end
-  end
-
-  def process_feed_validate_output(barcode, output)
-    return if output.chomp.length.zero?
-
-    err_lines = output.chomp.split("\n")
-    err_lines.each do |line|
-      next if line == 'failure!' && err_lines.count > 1
-      next if line == 'success!'
-
-      process_feed_validate_line barcode, line
+    jhove.errors.each do |err|
+      add_error JHOVE.error_object(err)
     end
-  end
-
-  def process_feed_validate_line(barcode, line)
-    # Remove ANSI color and leading runtime info and pid
-    line = line.decolorize.sub(/.+?(?=(ERROR|WARN))/, '')
-    fields = line.split("\t")
-    # Extract file if possible, nil if no match
-    file = line[/\tfile: (.*?)(\t|$)/, 1]
-    # Remove fields starting with "objid: ", "namespace: ", "remediable: ",
-    # "stage: ", and "file: "
-    re = /^(objid|namespace|remediable|stage|file): /
-    fields = fields.delete_if { |f| re.match? f }
-    desc = fields.join ', '
-    # Compact "Invalid value for field, field:" errors
-    desc = desc.gsub(/Invalid value for field, field:/i,
-                     'invalid value for field')
-    return if redundant_error?(desc, barcode, file)
-
-    add_feed_validate_error(desc, barcode, file)
-  end
-
-  def add_feed_validate_error(desc, barcode, file)
-    if /^warn - /i.match? desc
-      desc = desc.gsub(/^warn - /i, '')
-      add_warning Error.new(desc, barcode, file)
-    else
-      desc = desc.gsub(/^error - /i, '')
-      add_error Error.new(desc, barcode, file)
-    end
-  end
-
-  def redundant_error?(desc, barcode, file)
-    /validation failed/i.match?(desc) && !file.nil? &&
-      errors.any? { |err| err.barcode == barcode && err.path == file }
   end
 end
