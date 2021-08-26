@@ -17,3 +17,17 @@ module Symbolize
     obj
   end
 end
+
+# Hash#symbolize method
+class Hash
+  def symbolize
+    Symbolize.symbolize self
+  end
+end
+
+# Array#symbolize method
+class Array
+  def symbolize
+    Symbolize.symbolize self
+  end
+end
