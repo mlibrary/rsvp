@@ -137,13 +137,13 @@ class DLXSTestShipment < TestShipment
   def self.generate_barcode(valid = true)
     barcode = [[*('a'..'z'), *('0'..'9')].sample(8).join,
                4.times.map { rand 10 }.join,
-               3.times.map { rand 10 }.join].join('/')
+               3.times.map { rand 10 }.join].join('.')
     valid ? barcode : barcode.reverse
   end
 
   def handle_barcode_op
     barcode = self.class.generate_barcode(true)
-    components = barcode.split '/'
+    components = barcode.split '.'
     path = @dir
     components.each do |component|
       path = File.join(path, component)
@@ -155,7 +155,7 @@ class DLXSTestShipment < TestShipment
 
   def handle_bogus_barcode_op
     barcode = self.class.generate_barcode(false)
-    components = barcode.split '/'
+    components = barcode.split '.'
     path = @dir
     components.each do |component|
       path = File.join(path, component)

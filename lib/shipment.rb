@@ -84,11 +84,15 @@ class Shipment # rubocop:disable Metrics/ClassLength
             " other than #{self.class::PATH_COMPONENTS} (#{path_components})"
     end
 
-    path_components.join '/'
+    path_components.join barcode_separator
   end
 
   def barcode_to_path(barcode)
-    [barcode]
+    barcode.split barcode_separator
+  end
+
+  def barcode_separator
+    '/'
   end
 
   def barcode_directories
@@ -104,7 +108,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
   end
 
   def source_barcode_directories
-    source_barcodes.map { |barcode| File.join(@dir, barcode) }
+    source_barcodes.map { |barcode| source_barcode_directory barcode }
   end
 
   def source_barcodes
@@ -273,12 +277,12 @@ class DLXSShipment < Shipment
     super dir, metadata
   end
 
-  def barcode_to_path(barcode)
-    barcode.split '/'
+  def barcode_separator
+    '.'
   end
 
   # Returns an error message or nil
   def validate_barcode(barcode)
-    %r{^.*?/\d\d\d\d/\d\d\d$}.match?(barcode) ? nil : 'invalid volume/number'
+    /^.*?\.\d\d\d\d\.\d\d\d$/.match?(barcode) ? nil : 'invalid volume/number'
   end
 end

@@ -175,24 +175,25 @@ class QueryToolTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment.setup_source_directory
       shipment.checksum_source_directory
       barcode = shipment.barcodes[0]
+      barcode_path = shipment.barcode_to_path(barcode)
       # Add 00000001.tif, change 00000002.tif, and remove 00000003.tif
-      tiff1 = File.join(shipment.source_directory, barcode, '00000001.tif')
+      tiff1 = File.join(shipment.source_directory, barcode_path, '00000001.tif')
       refute File.exist?(tiff1), '(make sure 00000001.tif does not exist)'
       `/bin/echo -n 'test' > #{tiff1}`
-      tiff2 = File.join(shipment.source_directory, barcode, '00000002.tif')
+      tiff2 = File.join(shipment.source_directory, barcode_path, '00000002.tif')
       `/bin/echo -n 'test' > #{tiff2}`
-      tiff3 = File.join(shipment.source_directory, barcode, '00000003.tif')
+      tiff3 = File.join(shipment.source_directory, barcode_path, '00000003.tif')
       FileUtils.rm tiff3
       tool = QueryTool.new(processor)
       out, _err = capture_io do
         tool.fixity_cmd
       end
       out = out.decolorize
-      assert_match "Added\n  #{File.join(barcode, '00000001.tif')}",
+      assert_match "Added\n  #{File.join(barcode_path, '00000001.tif')}",
                    out, '00000001.tif added'
-      assert_match "Changed\n  #{File.join(barcode, '00000002.tif')}",
+      assert_match "Changed\n  #{File.join(barcode_path, '00000002.tif')}",
                    out, '00000002.tif changed'
-      assert_match "Removed\n  #{File.join(barcode, '00000003.tif')}",
+      assert_match "Removed\n  #{File.join(barcode_path, '00000003.tif')}",
                    out, '00000003.tif removed'
     }
     generate_tests 'fixity_cmd', test_proc

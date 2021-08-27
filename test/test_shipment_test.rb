@@ -104,14 +104,16 @@ class TestShipmentTest < Minitest::Test
 end
 
 class DLXSTestShipmentTest < Minitest::Test
-  def test_generate_test_shipment_dlxs_barcode
+  def test_generate_test_shipment_dlxs_barcode # rubocop:disable Metrics/AbcSize
     shipment = DLXSTestShipment.new(test_name, 'BC')
     assert_equal 1, shipment.ordered_barcodes.count,
                  'correct number of ordered barcodes'
-    (vol, num) = shipment.ordered_barcodes[0].split '/'
-    assert File.directory?(File.join(shipment.directory, vol)),
-           'shipment/volume is directory'
-    assert File.directory?(File.join(shipment.directory, vol, num)),
-           'shipment/volume/number is directory'
+    (id, vol, num) = shipment.ordered_barcodes[0].split '.'
+    assert File.directory?(File.join(shipment.directory, id)),
+           'shipment/id is directory'
+    assert File.directory?(File.join(shipment.directory, id, vol)),
+           'shipment/id/volume is directory'
+    assert File.directory?(File.join(shipment.directory, id, vol, num)),
+           'shipment/id/volume/number is directory'
   end
 end
