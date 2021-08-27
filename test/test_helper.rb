@@ -15,7 +15,6 @@ $LOAD_PATH << File.join(APP_ROOT, 'lib')
 $LOAD_PATH << File.join(APP_ROOT, 'lib', 'stage')
 $LOAD_PATH << TEST_ROOT
 
-
 require 'minitest'
 require 'test_shipment'
 require 'string_color'
