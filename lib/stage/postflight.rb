@@ -57,8 +57,7 @@ class Postflight < Stage
   end
 
   def run_jhove(barcode)
-    dir = File.join(shipment.directory, shipment.barcode_to_path(barcode))
-    jhove = JHOVE.new(dir, config)
+    jhove = JHOVE.new(shipment.barcode_directory(barcode), config)
     begin
       jhove.run
     rescue StandardError => e

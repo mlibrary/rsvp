@@ -19,6 +19,11 @@ require 'minitest'
 require 'test_shipment'
 require 'string_color'
 
+# Clean up any leftover test shipments
+if File.directory? TestShipment::PATH
+  FileUtils.rm_r(TestShipment::PATH, force: true)
+end
+
 module Minitest
   class Test
     @generated_tests = {}

@@ -51,7 +51,9 @@ class StageTest < Minitest::Test
       test_shipment = test_shipment_class.new(dir, 'BC')
       shipment = shipment_class.new(test_shipment.directory)
       stage = Stage.new(shipment, config: @config.merge(opts))
-      temp = File.join(shipment.directory, shipment.barcodes[0], 'temp.txt')
+      temp = File.join(shipment.directory,
+                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       'temp.txt')
       FileUtils.touch(temp)
       stage.delete_on_success temp
       stage.cleanup
