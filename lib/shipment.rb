@@ -14,6 +14,7 @@ ImageFile = Struct.new(:barcode, :path, :barcode_file, :file)
 # Shipment directory class
 class Shipment # rubocop:disable Metrics/ClassLength
   PATH_COMPONENTS = 1
+  OBJID_SEPARATOR = '/'
   attr_reader :metadata
 
   def self.json_create(hash)
@@ -84,15 +85,11 @@ class Shipment # rubocop:disable Metrics/ClassLength
             " other than #{self.class::PATH_COMPONENTS} (#{path_components})"
     end
 
-    path_components.join barcode_separator
+    path_components.join self.class::OBJID_SEPARATOR
   end
 
   def barcode_to_path(barcode)
-    barcode.split barcode_separator
-  end
-
-  def barcode_separator
-    '/'
+    barcode.split self.class::OBJID_SEPARATOR
   end
 
   def barcode_directories
@@ -273,12 +270,9 @@ end
 # Shipment directory class for DLXS nested id/volume/number directories
 class DLXSShipment < Shipment
   PATH_COMPONENTS = 3
+  OBJID_SEPARATOR = '.'
   def initialize(dir, metadata = nil)
     super dir, metadata
-  end
-
-  def barcode_separator
-    '.'
   end
 
   # Returns an error message or nil
