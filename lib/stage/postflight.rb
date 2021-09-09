@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require 'digest'
-require 'open3'
 require 'set'
 
 require 'jhove'

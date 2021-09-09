@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'open3'
 require 'stage'
 
 JP2_LEVEL_MIN = 5
@@ -14,13 +13,6 @@ JP2_SLOPE = 42_988
 
 TIFF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
 
-# Internal class for errors arising from external binaries
-class CompressorError < StandardError
-  def initialize(msg, command = '', detail = '')
-    super "#{self.class}: #{msg} (#{command}) (#{detail})"
-  end
-end
-
 # TIFF to JP2/TIFF compression stage
 class Compressor < Stage # rubocop:disable Metrics/ClassLength
   def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
@@ -28,10 +20,13 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
 
     files = image_files.select { |file| agenda.include? file.barcode }
     @bar.steps = files.count
-    files.each_with_index do |image_file, i|
-      metadata = tiffinfo(image_file)
-      next if metadata.nil?
-
+    files.each_with_index do |image_file, i| # rubocop:disable Metrics/BlockLength
+      begin
+        metadata = tiffinfo(image_file)
+      rescue StandardError => e
+        add_error Error.new(e.message, image_file.barcode, image_file.file)
+        next
+      end
       # Figure out what sort of image this is.
       m = metadata.match(%r{Bits/Sample:\s(\d+)})
       bps = m[1].to_i
@@ -41,7 +36,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         @bar.step! i, "#{image_file.barcode_file} JP2"
         begin
           handle_8_bps_conversion(image_file, metadata)
-        rescue CompressorError => e
+        rescue StandardError => e
           add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
       when 1
@@ -49,7 +44,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         @bar.step! i, "#{image_file.barcode_file} G4"
         begin
           handle_1_bps_conversion(image_file, metadata)
-        rescue CompressorError => e
+        rescue StandardError => e
           add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
       else
@@ -61,23 +56,15 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
 
   private
 
-  def tiffinfo(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def tiffinfo(image_file)
     cmd = "tiffinfo #{image_file.path}"
-    stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      add_error Error.new("'#{cmd}' exit status #{code.exitstatus}",
-                          image_file.barcode, image_file.file)
-      return nil
+    status = Command.new(cmd).run
+    status[:stderr].chomp.split("\n").each do |err|
+      raise err unless /tag\signored/.match? err
+
+      add_warning Error.new(err, image_file.barcode, image_file.file)
     end
-    stderr_str.chomp.split("\n").each do |err|
-      if /tag\signored/.match? err
-        add_warning Error.new(err, image_file.barcode, image_file.file)
-      else
-        add_error Error.new(err, image_file.barcode, image_file.file)
-        return nil
-      end
-    end
-    stdout_str
+    status[:stdout]
   end
 
   def handle_8_bps_conversion(image_file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -138,36 +125,29 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
 
   def remove_tiff_metadata(path, destination)
     cmd = "exiftool -XMP:All= -MakerNotes:All= #{path} -o #{destination}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not extract XMP-less TIFF',
-                                cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def remove_tiff_alpha(path)
     tmp = path + '.alphaoff'
     cmd = "convert #{path} -alpha off #{tmp}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not remove alpha channel',
-                                cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
     FileUtils.mv(tmp, path)
   end
 
-  def strip_tiff_profiles(path)
+  def strip_tiff_profiles(path) # rubocop:disable Metrics/MethodLength
     tmp = path + '.stripped'
     cmd = "convert #{path} -strip #{tmp}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    if code.exitstatus.zero?
-      log cmd
-      FileUtils.mv(tmp, path)
-    else
-      warning = "couldn't remove ICC profile (#{cmd}) (#{stderr_str})"
+    begin
+      status = Command.new(cmd).run
+    rescue StandardError => e
+      warning = "couldn't remove ICC profile (#{cmd}) (#{e.message})"
       add_warning Error.new(warning, barcode_from_path(path), path)
+    else
+      log cmd, status[:time]
+      FileUtils.mv(tmp, path)
     end
   end
 
@@ -181,13 +161,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
           " 'Cuse_eph=#{JP2_USE_EPH}'" \
           " Cmodes=#{JP2_MODES}" \
           " -no_weights -slope '#{JP2_SLOPE}'"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not convert to JPEG 2000',
-                                cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def copy_jp2_metadata(source, destination, document_name, metadata) # rubocop:disable Metrics/MethodLength
@@ -218,27 +193,19 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
           " '-IFD0:Software>XMP-tiff:Software'"               \
           " '#{datetime}'"                                    \
           " -overwrite_original #{destination}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not copy TIFF metadata', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
-  def copy_jp2_alphaless_metadata(source, destination) # rubocop:disable Metrics/MethodLength
+  def copy_jp2_alphaless_metadata(source, destination)
     cmd = "exiftool -tagsFromFile #{source}" \
             " '-IFD0:BitsPerSample>XMP-tiff:BitsPerSample'"     \
             " '-IFD0:SamplesPerPixel>XMP-tiff:SamplesPerPixel'" \
             " '-IFD0:PhotometricInterpretation>XMP-tiff:"       \
             "PhotometricInterpretation'"                        \
             " -overwrite_original '#{destination}'"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not copy alphaless TIFF metadata',
-                                cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def handle_1_bps_conversion(image_file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -267,12 +234,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
   def compress_tiff(path, destination)
     cmd = "tifftopnm #{path} | pnmtotiff -g4 -rowsperstrip" \
           " 196136698 > #{destination}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('failed to compress TIFF', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def copy_tiff_metadata(path, destination) # rubocop:disable Metrics/MethodLength
@@ -289,61 +252,37 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
           " '-IFD0:Model'"                     \
           " '-IFD0:Software'"                  \
           " -overwrite_original '#{destination}'"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not copy TIFF metadata', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def copy_tiff_page1(path, destination)
     cmd = "tiffcp #{path},0 #{destination}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('could not copy TIFF page 1', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   # Set the document name with barcode/image.tif
   def write_tiff_document_name(image_file, destination)
     cmd = "tiffset -s 269 '#{image_file.barcode_file}' #{destination}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('could not set 269 doc name', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   # Remove ImageMagick software tag (if it exists) and replace with original
-  def write_tiff_software(path, software) # rubocop:disable Metrics/MethodLength
+  def write_tiff_software(path, software)
     cmd = "exiftool -IFD0:Software= -overwrite_original #{path}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('could not remove ImageMagick software tag',
-                                cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
     cmd = "tiffset -s 305 '#{software}' #{path}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('could not set 305 software', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def write_tiff_date_time(path)
     date = Time.now.strftime(TIFF_DATE_FORMAT)
     cmd = "tiffset -s 306 '#{date}' #{path}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('failed to set TIFF date', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 end

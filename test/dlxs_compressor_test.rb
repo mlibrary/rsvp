@@ -51,12 +51,3 @@ class DLXSCompressorTest < Minitest::Test
 
   invoke_gen
 end
-
-class DLXSCompressorErrorTest < MiniTest::Test
-  def test_new
-    err = DLXSCompressorError.new('message', 'command', '(detail)')
-    refute_nil err, 'DLXSCompressorError successfully created'
-    assert_kind_of StandardError, err, 'error is a kind of StandardError'
-    assert_instance_of DLXSCompressorError, err, 'error is DLXSCompressorError'
-  end
-end

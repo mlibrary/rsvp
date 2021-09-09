@@ -75,27 +75,11 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def status_cmd # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def status_cmd
     processor.stages.each do |stage|
-      status = ''
-      if stage.end.nil?
-        status = 'not yet run'.italic
-      elsif stage.fatal_error?
-        status = 'fatal error'.red
-      elsif stage.errors.count.zero? && stage.warnings.count.zero?
-        status = 'PASS'.green
-      else
-        total = processor.shipment.barcodes.count
-        status = "#{stage.error_barcodes.count}/#{total}" \
-                 " #{pluralize(total, 'barcode')} failed,"  \
-                 " #{stage.errors.count}" \
-                 " #{pluralize(stage.errors.count, 'error').red}"
-        if stage.warnings.any?
-          status += ", #{stage.warnings.count}" \
-                    " #{pluralize(stage.warnings.count, 'warning').brown}"
-        end
-      end
-      printf "%-28s #{status}\n", stage.name.bold
+      printf "%<name>-28s %<status>-16s %<timing>-20s %<detail>s\n",
+             { name: stage.name.bold, status: status_status(stage),
+               timing: status_timing(stage), detail: status_detail(stage) }
     end
   end
 
@@ -133,5 +117,43 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     else
       singular + 's'
     end
+  end
+
+  private
+
+  def status_status(stage)
+    if stage.end.nil?
+      'not yet run'.italic
+    elsif stage.fatal_error?
+      'FAIL'.red
+    elsif stage.errors.count.zero?
+      'PASS'.green
+    else
+      'PARTIAL'.brown
+    end
+  end
+
+  def status_detail(stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    statuses = []
+    bad = stage.error_barcodes.count
+    total = stage.barcodes.count
+    errors = stage.errors.count
+    if bad.positive?
+      statuses << "#{bad}/#{total} #{pluralize(total, 'barcode')} failed"
+      statuses << "#{errors} #{pluralize(errors, 'error').red}"
+    end
+    warnings = stage.warnings.count
+    if warnings.positive?
+      statuses << "#{warnings} #{pluralize(warnings, 'warning').brown}"
+    end
+    return '' unless statuses.any?
+
+    statuses.join(', ')
+  end
+
+  def status_timing(stage)
+    return '' if stage.end.nil? || stage.start.nil?
+
+    format('%.2f sec'.italic, stage.end - stage.start)
   end
 end

@@ -43,7 +43,7 @@ class Processor # rubocop:disable Metrics/ClassLength
     else
       restore_from_source_directory changed_barcodes
     end
-    # Keep open3 quiet when processing is interrupted with Ctrl-C.
+    # Keep Open3 quiet when processing is interrupted with Ctrl-C.
     save_report_on_exception = Thread.report_on_exception
     Thread.report_on_exception = false
     run_stages
@@ -179,18 +179,16 @@ class Processor # rubocop:disable Metrics/ClassLength
 
     stage.reinitialize!
     print_progress "Running stage #{stage.name} with #{agenda}"
-    interrupt = false
     begin
       stage.run! stage_agenda
     rescue Interrupt
       puts "\nInterrupted".red
       stage.add_error Error.new('Interruped')
-      interrupt = true
     rescue StandardError => e
       stage.add_error Error.new("#{e.inspect} #{e.backtrace}")
       puts "#{e.inspect} #{e.backtrace}"
     ensure
-      stage.cleanup interrupt
+      stage.cleanup
       agenda.update stage
     end
   end

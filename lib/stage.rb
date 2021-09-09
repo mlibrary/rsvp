@@ -20,6 +20,10 @@ class Stage # rubocop:disable Metrics/ClassLength
     new nil, **data
   end
 
+  def self.json_time(time)
+    time.nil? ? '' : time.strftime('%Y-%m-%d %H:%M:%S.%N %z')
+  end
+
   def to_json(*args)
     {
       'json_class' => self.class.name,
@@ -27,8 +31,8 @@ class Stage # rubocop:disable Metrics/ClassLength
                   errors: @errors,
                   warnings: @warnings,
                   data: @data,
-                  start: @start.to_s,
-                  end: @end.to_s }
+                  start: Stage.json_time(@start),
+                  end: Stage.json_time(@end) }
     }.to_json(*args)
   end
 
@@ -45,13 +49,13 @@ class Stage # rubocop:disable Metrics/ClassLength
     @errors = args[:errors] || [] # Fatal conditions, Array of Error
     @warnings = args[:warnings] || [] # Nonfatal conditions, Array of Error
     @data = args[:data] || {} # Misc data structure including log
-    # Time the stage was last run (may be unneeded)
+    # Time the stage was last run
     @start = if args[:start].to_s == ''
                nil
              else
                Time.parse args[:start]
              end
-    # Time the stage last finished running (may be unneeded)
+    # Time the stage last finished running
     # Currently used by #complete?
     @end = if args[:end].to_s == ''
              nil
@@ -79,6 +83,7 @@ class Stage # rubocop:disable Metrics/ClassLength
     run agenda
     cleanup
     @end = Time.now
+    @bar.done! format('%.3f sec', @end - @start)
   end
 
   # This is the method that needs to be implemented by a subclass
@@ -155,11 +160,10 @@ class Stage # rubocop:disable Metrics/ClassLength
 
   # Expected to be run as part of #run,
   # may be called multiple times.
-  def cleanup(interrupt = false)
+  def cleanup
     cleanup_copy_on_success
     cleanup_delete_on_success
     cleanup_tempdirs
-    @bar.done! unless interrupt
   end
 
   def cleanup_copy_on_success
@@ -216,7 +220,8 @@ class Stage # rubocop:disable Metrics/ClassLength
     @barcodes ||= shipment.barcodes
   end
 
-  def log(entry)
+  def log(entry, time = nil)
+    entry += format(' (%.3f sec)', time) unless time.nil?
     (@data[:log] ||= []) << entry
   end
 

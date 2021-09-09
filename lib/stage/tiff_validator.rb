@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'open3'
+require 'command'
 require 'stage'
 
 # TIFF Validation Stage
@@ -33,8 +33,9 @@ class TIFFValidator < Stage
   def run_tiffinfo(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     reported_error = false
     cmd = "tiffinfo #{image_file.path}"
-    stdout_str, stderr_str, code = Open3.capture3(cmd)
-    stderr_str.chomp.split("\n").each do |err|
+    status = Command.new(cmd).run(false)
+    log cmd, status[:time]
+    status[:stderr].chomp.split("\n").each do |err|
       if /warning/i.match? err
         add_warning Error.new(err, image_file.barcode, image_file.file)
       else
@@ -42,14 +43,14 @@ class TIFFValidator < Stage
         reported_error = true
       end
     end
-    if code.exitstatus != 0
+    if status[:code].exitstatus != 0
       unless reported_error
         add_error Error.new("'#{cmd}' exited with status #{code.exitstatus}",
                             image_file.barcode, image_file.file)
       end
       return nil
     end
-    stdout_str
+    status[:stdout]
   end
 
   # Resolution line must have 'pixels/inch' unit
