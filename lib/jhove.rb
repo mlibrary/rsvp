@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'open3'
+require 'command'
 require 'error'
 require 'symbolize'
 
@@ -30,11 +30,8 @@ class JHOVE # rubocop:disable Metrics/ClassLength
   # This is for Postflight.
   def run
     cmd = feed_validate_script
-    @raw_output, stderr_str, code = Open3.capture3(cmd)
-    unless code.success?
-      raise "'#{cmd}' returned #{code.exitstatus}: #{stderr_str}"
-    end
-
+    status = Command.new(cmd).run
+    @raw_output = status[:stdout]
     process_feed_validate_output
   end
 

@@ -1,15 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'open3'
+require 'command'
 require 'stage'
-
-# Internal class for errors arising from external binaries
-class DLXSCompressorError < StandardError
-  def initialize(msg, command = '', detail = '')
-    super "#{self.class}: #{msg} (#{command}) (#{detail})"
-  end
-end
 
 # JP2-to-TIFF conversion stage for DLXS
 class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
@@ -22,11 +15,10 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
       @bar.step! i, image_file.barcode_file
       begin
         handle_conversion image_file
-      rescue DLXSCompressorError => e
+      rescue StandardError => e
         add_error Error.new(e.message, image_file.barcode, image_file.path)
       end
     end
-    cleanup
   end
 
   private
@@ -64,12 +56,8 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
       '-IFD0:ImageDescription=extracted from JP2'
        -overwrite_original #{destination}
     CMD
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not copy TIFF metadata', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
     xres = get_x_resolution source
     yres = get_y_resolution source
     return unless /^\d+$/.match?(xres) && /^\d+$/.match?(yres)
@@ -80,34 +68,22 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
       '-IFD0:YResolution=#{yres.to_i * 3 / 2}'
       -overwrite_original #{destination}
     CMD
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not copy X/Y resolution metadata',
-                                cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   def get_x_resolution(path)
     cmd = "exiftool -XMP-tiff:XResolution #{path} | sed -e 's/^.*: *//'"
-    stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not get X resolution', cmd, stderr_str)
-    end
-
-    log cmd
-    stdout_str.chomp
+    status = Command.new(cmd).run
+    log cmd, status[:time]
+    status[:stdout].chomp
   end
 
   def get_y_resolution(path)
     cmd = "exiftool -XMP-tiff:YResolution #{path} | sed -e 's/^.*: *//'"
-    stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise CompressorError.new('Could not get Y resolution', cmd, stderr_str)
-    end
-
-    log cmd
-    stdout_str.chomp
+    status = Command.new(cmd).run
+    log cmd, status[:time]
+    status[:stdout].chomp
   end
 
   # Converts 'source.tif' to 'source.pgm' in temporary directory
@@ -116,12 +92,8 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
     pnm = File.join(dir, 'source.pnm')
     pgm = File.join(dir, 'source.pgm')
     cmd = "tifftopnm #{source} > #{pnm}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise DLXSCompressorError.new('Could not convert to PGM',
-                                    cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
     FileUtils.rm source
     header = nil
     File.open(pnm, 'rb') do |file|
@@ -133,15 +105,11 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
       log "mv #{pnm} #{pgm}"
     when 'P6'
       cmd = "ppmtopgm #{pnm} > #{pgm}"
-      _stdout_str, stderr_str, code = Open3.capture3(cmd)
-      unless code.exitstatus.zero?
-        raise DLXSCompressorError.new('Could not convert to PGM',
-                                      cmd, stderr_str)
-      end
+      status = Command.new(cmd).run
+      log cmd, status[:time]
       FileUtils.rm pnm
-      log cmd
     else
-      raise DLXSCompressorError.new("PNM header '#{header}' not in {P5,P6}", '')
+      raise "PNM header '#{header}' not in {P5,P6}"
     end
   end
 
@@ -151,24 +119,16 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
     bitonal = File.join(dir, 'bitonal.tif')
     cmd = "pnmscale 1.5 #{pgm} | pgmnorm | pgmtopbm -threshold \
       | pnmtotiff -g4 -rowsperstrip 196136698 > #{bitonal}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise DLXSCompressorError.new('Could not convert to PGM', cmd, stderr_str)
-    end
-
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
     FileUtils.rm pgm
   end
 
   # Expand existing jp2 into tif in temp directory
   def expand_jp2(src, dest)
     cmd = "kdu_expand -quiet -i '#{src}' -o '#{dest}'"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      raise DLXSCompressorError.new('Could not expand JPEG 2000',
-                                    cmd, stderr_str)
-    end
-    log cmd
+    status = Command.new(cmd).run
+    log cmd, status[:time]
   end
 
   # Replace first leading zero with 'p'

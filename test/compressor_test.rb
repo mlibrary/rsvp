@@ -172,12 +172,3 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
 
   invoke_gen
 end
-
-class CompressorErrorTest < MiniTest::Test
-  def test_new
-    err = CompressorError.new('message', 'command', '(detail)')
-    refute_nil err, 'CompressorError successfully created'
-    assert_kind_of StandardError, err, 'error is a kind of StandardError'
-    assert_instance_of CompressorError, err, 'error is CompressorError'
-  end
-end

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'open3'
+require 'command'
 require 'stage'
 require 'tag_data'
 
@@ -97,12 +97,12 @@ class Tagger < Stage
 
   def run_tiffset(image_file, tag, value) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     cmd = "tiffset -s #{tag} '#{value}' #{image_file.path}"
-    _stdout_str, stderr_str, code = Open3.capture3(cmd)
-    unless code.exitstatus.zero?
-      add_error Error.new("'#{cmd}': exited with status #{code}",
+    status = Command.new(cmd).run(false)
+    unless status[:code].exitstatus.zero?
+      add_error Error.new("'#{cmd}': exited with status #{status[:code]}",
                           image_file.barcode, image_file.path)
     end
-    stderr_str.chomp.split("\n").each do |err|
+    status[:stderr].chomp.split("\n").each do |err|
       if /tag\signored/.match? err
         add_warning Error.new("#{cmd}: #{err}", image_file.barcode,
                               image_file.path)
