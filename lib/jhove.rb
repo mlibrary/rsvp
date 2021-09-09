@@ -143,7 +143,7 @@ class JHOVE # rubocop:disable Metrics/ClassLength
   end
 
   def fields_for_merge(err)
-    [err[:description], err[:expected], err[:actual]]
+    [err[:description], err[:expected], err[:actual], err[:detail]]
   end
 
   # Strip off any leading or trailing non-numeric characters
@@ -156,6 +156,8 @@ class JHOVE # rubocop:disable Metrics/ClassLength
   end
 
   def error_field(err)
-    "#{err[:description]}: #{err[:field]}"
+    field = "#{err[:description]}: #{err[:field]}"
+    field += " (#{err[:detail]})" unless err[:detail].nil?
+    field
   end
 end

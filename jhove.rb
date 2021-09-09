@@ -42,7 +42,8 @@ if options[:help]
   exit 0
 end
 
-if ARGV.count.zero?
+args = $stdin.tty? ? ARGV : $stdin.read.split("\n")
+if args.count.zero?
   puts 'Missing required parameter SHIPMENT_DIRECTORY'.red
   puts opts.help
   exit 1
@@ -54,7 +55,7 @@ statuses = {}
 err_file = ['jhove', Time.now.strftime('%Y%m%d_%H%M%S'), 'errors.txt'].join '_'
 outfile = File.open err_file, 'w'
 
-ARGV.each do |arg| # rubocop:disable Metrics/BlockLength
+args.each do |arg| # rubocop:disable Metrics/BlockLength
   dir = Pathname.new(arg).cleanpath.to_s
   unless File.exist? dir
     statuses[arg] = 'No such directory'.red
@@ -74,7 +75,7 @@ ARGV.each do |arg| # rubocop:disable Metrics/BlockLength
     next
   end
   jhove.error_fields.each do |field|
-    outfile.puts field.capitalize.to_s
+    outfile.puts field.to_s.capitalize
     jhove.errors_for_field(field).each do |err|
       expected = ''
       unless err[:expected].nil? || err[:actual].nil?
