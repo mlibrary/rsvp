@@ -74,6 +74,7 @@ args.each do |arg| # rubocop:disable Metrics/BlockLength
     outfile.write jhove.raw_output
     next
   end
+  outfile.puts 'OK' if jhove.error_fields.none?
   jhove.error_fields.each do |field|
     outfile.puts field.to_s.capitalize
     jhove.errors_for_field(field).each do |err|
