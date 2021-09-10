@@ -20,22 +20,19 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
 
     files = image_files.select { |file| agenda.include? file.barcode }
     @bar.steps = files.count
-    files.each_with_index do |image_file, i| # rubocop:disable Metrics/BlockLength
+    files.each_with_index do |image_file, i|
       begin
-        metadata = tiffinfo(image_file)
+        tiffinfo = TIFF.new(image_file.path).info
       rescue StandardError => e
         add_error Error.new(e.message, image_file.barcode, image_file.file)
         next
       end
-      # Figure out what sort of image this is.
-      m = metadata.match(%r{Bits/Sample:\s(\d+)})
-      bps = m[1].to_i
-      case bps
+      case tiffinfo[:bps]
       when 8
         # It's a contone, so we convert to JP2.
         @bar.step! i, "#{image_file.barcode_file} JP2"
         begin
-          handle_8_bps_conversion(image_file, metadata)
+          handle_8_bps_conversion(image_file, tiffinfo)
         rescue StandardError => e
           add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
@@ -43,12 +40,12 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
         # It's bitonal, so we G4 compress it.
         @bar.step! i, "#{image_file.barcode_file} G4"
         begin
-          handle_1_bps_conversion(image_file, metadata)
+          handle_1_bps_conversion(image_file, tiffinfo)
         rescue StandardError => e
           add_error Error.new(e.message, image_file.barcode, image_file.file)
         end
       else
-        add_error Error.new("invalid source TIFF BPS #{bps}",
+        add_error Error.new("invalid source TIFF BPS #{tiffinfo[:bps]}",
                             image_file.barcode, image_file.file)
       end
     end
@@ -56,18 +53,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
 
   private
 
-  def tiffinfo(image_file)
-    cmd = "tiffinfo #{image_file.path}"
-    status = Command.new(cmd).run
-    status[:stderr].chomp.split("\n").each do |err|
-      raise err unless /tag\signored/.match? err
-
-      add_warning Error.new(err, image_file.barcode, image_file.file)
-    end
-    status[:stdout]
-  end
-
-  def handle_8_bps_conversion(image_file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_8_bps_conversion(image_file, tiffinfo) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tmpdir = create_tempdir
     sparse = File.join(tmpdir, 'sparse.tif')
     new_image = File.join(tmpdir, 'new.jp2')
@@ -80,13 +66,9 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # it's been a while since we last ran exiftool, this might take a sec.
     remove_tiff_metadata(image_file.path, sparse)
 
-    alpha_channel = false
-    if /Extra\sSamples:\s1<unassoc-alpha>/.match? metadata
-      alpha_channel = true
-      remove_tiff_alpha(sparse)
-    end
+    remove_tiff_alpha(sparse) if tiffinfo[:alpha]
 
-    strip_tiff_profiles(sparse) if /ICC\sProfile:\s<present>/.match? metadata
+    strip_tiff_profiles(sparse) if tiffinfo[:icc]
 
     # FIXME: process-tiffs.sh defines this variable but does not
     # use it. Check the original on tang.
@@ -100,24 +82,22 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # This will always take a second. Other than the initial loading
     # of exiftool libraries, this is the only JP2 step that takes
     # noticeable time.
-    compress_jp2(sparse, new_image, metadata)
+    compress_jp2(sparse, new_image, tiffinfo)
     # We have our JP2; we can remove the middle TIFF. Then we try
     # to grab metadata from the original TIFF. This should be very
     # quick since we just used exiftool a few lines back.
-    copy_jp2_metadata(image_file.path, new_image, document_name, metadata)
+    copy_jp2_metadata(image_file.path, new_image, document_name, tiffinfo)
     # If our image had an alpha channel, it'll be gone now, and
     # the XMP data needs to reflect that (previously, we were
     # taking that info from the original image).
-    copy_jp2_alphaless_metadata(sparse, new_image) if alpha_channel
+    copy_jp2_alphaless_metadata(sparse, new_image) if tiffinfo[:alpha]
     copy_on_success new_image, final_image, image_file.barcode
     delete_on_success image_file.path, image_file.barcode
   end
 
-  def jp2_clevels(metadata)
-    # Get the width and height.
-    m = metadata.match(/Image\sWidth:\s(\d+)\sImage\sLength:\s(\d+)/)
-    # Figure out which is larger.
-    size = [m[1].to_i, m[2].to_i].max
+  def jp2_clevels(tiffinfo)
+    # Get the width and height, figure out which is larger.
+    size = [tiffinfo[:width], tiffinfo[:height]].max
     # Calculate appropriate Clevels.
     clevels = (Math.log(size.to_i / 100.0) / Math.log(2)).to_i
     clevels < JP2_LEVEL_MIN ? JP2_LEVEL_MIN : clevels
@@ -151,8 +131,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def compress_jp2(source, destination, metadata) # rubocop:disable Metrics/MethodLength
-    clevels = jp2_clevels(metadata)
+  def compress_jp2(source, destination, tiffinfo) # rubocop:disable Metrics/MethodLength
+    clevels = jp2_clevels(tiffinfo)
     cmd = "kdu_compress -quiet -i #{source} -o #{destination}" \
           " 'Clevels=#{clevels}'" \
           " 'Clayers=#{JP2_LAYERS}'" \
@@ -165,11 +145,11 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     log cmd, status[:time]
   end
 
-  def copy_jp2_metadata(source, destination, document_name, metadata) # rubocop:disable Metrics/MethodLength
+  def copy_jp2_metadata(source, destination, document_name, tiffinfo) # rubocop:disable Metrics/MethodLength
     # If the original image has a date, we want it. If not, we
     # want to add the current date.
     # date "%Y-%m-%dT%H:%M:%S"
-    datetime = if /DateTime:/.match? metadata
+    datetime = if tiffinfo[:date_time]
                  '-IFD0:ModifyDate>XMP-tiff:DateTime'
                else
                  "-XMP-tiff:DateTime=#{Time.now.strftime('%FT%T')}"
@@ -208,7 +188,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     log cmd, status[:time]
   end
 
-  def handle_1_bps_conversion(image_file, metadata) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def handle_1_bps_conversion(image_file, tiffinfo) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tmpdir = create_tempdir
     compressed = File.join(tmpdir,
                            "#{File.basename(image_file.path)}-compressed")
@@ -217,14 +197,13 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     copy_tiff_metadata(image_file.path, compressed)
     copy_tiff_page1(compressed, page1)
     FileUtils.rm(compressed)
-    write_tiff_date_time page1 unless /DateTime:/.match? metadata
+    write_tiff_date_time page1 unless tiffinfo[:date_time]
     write_tiff_document_name(image_file, page1)
-    match = /Software:\s(.+)/.match metadata
-    if match.nil?
+    if tiffinfo[:software]
+      write_tiff_software(page1, tiffinfo[:software])
+    else
       add_warning Error.new('could not extract software', image_file.barcode,
                             image_file.path)
-    else
-      write_tiff_software(page1, match[1])
     end
     copy_on_success page1, image_file.path, image_file.barcode
   end
