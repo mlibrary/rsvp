@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'command'
 require 'stage'
 require 'tag_data'
+require 'tiff'
 
 # TIFF Metadata update stage
 # The only thing that is required here is that the artist tag for 'dcu'
@@ -70,20 +70,26 @@ class Tagger < Stage
     tag_artist tagged
     tag_scanner tagged
     tag_software tagged
-    run_tiffset(tagged, 274, '1')
+    run_tiffset(tagged, TIFF::TIFFTAG_ORIENTATION, '1')
   end
 
   def tag_artist(image_file)
-    run_tiffset(image_file, 315, @artist_tag) unless @artist_tag.nil?
+    return if @artist_tag.nil?
+
+    run_tiffset(image_file, TIFF::TIFFTAG_ARTIST, @artist_tag)
   end
 
   def tag_scanner(image_file)
-    run_tiffset(image_file, 271, @make_tag) unless @make_tag.nil?
-    run_tiffset(image_file, 272, @model_tag) unless @model_tag.nil?
+    run_tiffset(image_file, TIFF::TIFFTAG_MAKE, @make_tag) unless @make_tag.nil?
+    return if @model_tag.nil?
+
+    run_tiffset(image_file, TIFF::TIFFTAG_MODEL, @model_tag)
   end
 
   def tag_software(image_file)
-    run_tiffset(image_file, 305, @software_tag) unless @software_tag.nil?
+    return if @software_tag.nil?
+
+    run_tiffset(image_file, TIFF::TIFFTAG_SOFTWARE, @software_tag)
   end
 
   def tempdir_for_file(image_file)
@@ -96,21 +102,18 @@ class Tagger < Stage
   end
 
   def run_tiffset(image_file, tag, value) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    cmd = "tiffset -s #{tag} '#{value}' #{image_file.path}"
-    status = Command.new(cmd).run(false)
-    unless status[:code].exitstatus.zero?
-      add_error Error.new("'#{cmd}': exited with status #{status[:code]}",
-                          image_file.barcode, image_file.path)
+    begin
+      info = TIFF.new(image_file.path).set(tag, value)
+    rescue StandardError => e
+      add_error Error.new(e.message, image_file.barcode, image_file.file)
+      return
     end
-    status[:stderr].chomp.split("\n").each do |err|
-      if /tag\signored/.match? err
-        add_warning Error.new("#{cmd}: #{err}", image_file.barcode,
-                              image_file.path)
-      else
-        add_error Error.new("#{cmd}: #{err}", image_file.barcode,
-                            image_file.path)
-        next
-      end
+    log info[:cmd], info[:time]
+    info[:warnings].each do |err|
+      add_warning Error.new(err, image_file.barcode, image_file.file)
+    end
+    info[:errors].each do |err|
+      add_error Error.new(err, image_file.barcode, image_file.file)
     end
   end
 end

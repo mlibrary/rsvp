@@ -3,27 +3,24 @@
 
 require 'command'
 require 'stage'
+require 'tiff'
 
 # TIFF Validation Stage
 class TIFFValidator < Stage
-  BITONAL_RES = '600'
-  CONTONE_RES = '400'
+  BITONAL_RES = 600
+  CONTONE_RES = 400
 
-  def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def run(agenda)
     return unless agenda.any?
 
     files = image_files.select { |file| agenda.include? file.barcode }
     @bar.steps = files.count
     files.each do |image_file|
       @bar.next! image_file.barcode_file
-      tiffinfo = run_tiffinfo(image_file)
+      tiffinfo = run_tiffinfo image_file
       next if tiffinfo.nil?
 
-      fields = extract_tiff_fields tiffinfo
-      err = evaluate fields
-      unless err.nil?
-        add_error Error.new(err, image_file.barcode, image_file.file)
-      end
+      evaluate image_file, tiffinfo
     end
   end
 
@@ -31,26 +28,20 @@ class TIFFValidator < Stage
 
   # Run tiffinfo command and return output text block
   def run_tiffinfo(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    reported_error = false
-    cmd = "tiffinfo #{image_file.path}"
-    status = Command.new(cmd).run(false)
-    log cmd, status[:time]
-    status[:stderr].chomp.split("\n").each do |err|
-      if /warning/i.match? err
-        add_warning Error.new(err, image_file.barcode, image_file.file)
-      else
-        add_error Error.new(err, image_file.barcode, image_file.file)
-        reported_error = true
-      end
-    end
-    if status[:code].exitstatus != 0
-      unless reported_error
-        add_error Error.new("'#{cmd}' exited with status #{code.exitstatus}",
-                            image_file.barcode, image_file.file)
-      end
+    begin
+      info = TIFF.new(image_file.path).info
+    rescue StandardError => e
+      add_error Error.new(e.message, image_file.barcode, image_file.file)
       return nil
     end
-    status[:stdout]
+    log info[:cmd], info[:time]
+    info[:warnings].each do |err|
+      add_warning Error.new(err, image_file.barcode, image_file.file)
+    end
+    info[:errors].each do |err|
+      add_error Error.new(err, image_file.barcode, image_file.file)
+    end
+    info
   end
 
   # Resolution line must have 'pixels/inch' unit
@@ -58,44 +49,40 @@ class TIFFValidator < Stage
   # 'Samples/Pixel' line -> spp
   # bps of 1 requires spp=1 and xres=BITONAL_RES and yres=BITONAL_RES
   # bps of 8 requires spp in [1,3,4] and xres=CONTONE_RES and yres=CONTONE_RES
-  def evaluate(info) # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
+  def evaluate(image_file, info) # rubocop:disable Metrics/MethodLength
     if info[:res_unit] != 'pixels/inch'
-      return "must have pixels/inch resolution, not #{info[:res_unit]}"
+      image_error image_file, "must have pixels/inch, not #{info[:res_unit]}"
     end
-
     case info[:bps]
-    when '1'
-      return "can't have SPP #{info[:spp]} with 1 BPS" if info[:spp] != '1'
-
-      if info[:xres] != BITONAL_RES || info[:yres] != BITONAL_RES
-        "#{info[:xres]}x#{info[:yres]} bitonal"
-      end
-    when '8'
-      if %w[1 3 4].include? info[:spp]
-        if info[:xres] != CONTONE_RES || info[:yres] != CONTONE_RES
-          "#{info[:xres]}x#{info[:yres]} contone"
-        end
-      else
-        "can't have SPP #{info[:spp]} with 8 BPS"
-      end
+    when 1
+      evaluate_1_bps(image_file, info)
+    when 8
+      evaluate_8_bps(image_file, info)
     else
-      "can't have BPS #{info[:bps]}"
+      image_error image_file, "can't have BPS #{info[:bps]}"
     end
   end
 
-  # Return Hash with fields xres, yres, res_unit, bps, spp
-  def extract_tiff_fields(info) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    h = {}
-    m = info.match(/Resolution:\s(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)\s+(.*)/)
-    unless m.nil?
-      h[:xres] = m[1]
-      h[:yres] = m[2]
-      h[:res_unit] = m[3]
+  def evaluate_1_bps(image_file, info)
+    if info[:spp] != 1
+      image_error image_file, "invalid SPP #{info[:spp]} with 1 BPS"
     end
-    m = info.match(%r{Bits/Sample:\s(\d+)})
-    h[:bps] = m[1] unless m.nil?
-    m = info.match(%r{Samples/Pixel:\s(\d+)})
-    h[:spp] = m[1] unless m.nil?
-    h
+    return unless info[:x_res] != BITONAL_RES || info[:y_res] != BITONAL_RES
+
+    image_error image_file, "#{info[:x_res]}x#{info[:y_res]} bitonal"
+  end
+
+  def evaluate_8_bps(image_file, info)
+    if [1, 3, 4].include? info[:spp]
+      if info[:x_res] != CONTONE_RES || info[:y_res] != CONTONE_RES
+        image_error image_file, "#{info[:x_res]}x#{info[:y_res]} contone"
+      end
+    else
+      image_error image_file, "can't have SPP #{info[:spp]} with 8 BPS"
+    end
+  end
+
+  def image_error(image_file, err)
+    add_error Error.new(err, image_file.barcode, image_file.path)
   end
 end
