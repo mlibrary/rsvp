@@ -13,11 +13,11 @@ class JHOVE # rubocop:disable Metrics/ClassLength
                      remediable seq stage].freeze
 
   # Convert error Hash to Postflight Error object
-  def self.error_object(err, barcode = nil)
+  def self.error_object(err, objid = nil)
     fields = err.reject { |k, _v| JHOVE::UNUSED_FIELDS.include? k }
     desc = "#{err[:description]}: " +
            fields.map { |k, v| "#{k}: #{v}" }.join(', ')
-    Error.new desc, barcode, err[:file]
+    Error.new desc, objid, err[:file]
   end
 
   def initialize(directory, config)
@@ -56,7 +56,6 @@ class JHOVE # rubocop:disable Metrics/ClassLength
 
   def feed_validate_script
     components = ['perl', @config[:feed_validate_script], 'google mdp', @dir]
-    components << @barcode unless @barcode.nil?
     components.join ' '
   end
 

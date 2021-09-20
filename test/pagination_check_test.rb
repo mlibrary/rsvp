@@ -35,8 +35,8 @@ class PaginationCheckTest < Minitest::Test
       stage = PaginationCheck.new(shipment, config: opts.merge(@config))
       stage.run!
       assert(stage.errors.count == 1, 'one missing page error')
-      assert_equal(stage.errors[0].barcode, shipment.barcodes[0],
-                   'error barcode is shipment barcode')
+      assert_equal(stage.errors[0].objid, shipment.objids[0],
+                   'error objid is shipment objid')
       assert_match(/missing/, stage.errors[0].description,
                    'error contains "missing"')
     }

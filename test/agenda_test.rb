@@ -25,9 +25,9 @@ class AgendaTest < Minitest::Test
       test_shipment = test_shipment_class.new(dir, spec)
       processor = Processor.new(test_shipment.directory, opts)
       agenda = Agenda.new processor.shipment, processor.stages
-      assert_equal processor.shipment.barcodes,
+      assert_equal processor.shipment.objids,
                    agenda.for_stage(processor.stages[0]),
-                   'first stage has all shipment barcodes'
+                   'first stage has all shipment objids'
     }
     generate_tests 'for_stage', test_proc
   end
@@ -38,13 +38,13 @@ class AgendaTest < Minitest::Test
       test_shipment = test_shipment_class.new(dir, spec)
       processor = Processor.new(test_shipment.directory, opts)
       agenda = Agenda.new processor.shipment, processor.stages
-      err = Error.new 'test error', processor.shipment.barcodes[0],
+      err = Error.new 'test error', processor.shipment.objids[0],
                       '00000001.tif'
       processor.stages[0].add_error err
       agenda.update processor.stages[0]
-      assert_equal processor.shipment.barcodes[1..],
+      assert_equal processor.shipment.objids[1..],
                    agenda.for_stage(processor.stages[1]),
-                   'subsequent stage has one less barcode'
+                   'subsequent stage has one less objid'
     }
     generate_tests 'update', test_proc
   end
@@ -59,7 +59,7 @@ class AgendaTest < Minitest::Test
       processor.stages[0].add_error err
       agenda.update processor.stages[0]
       assert_equal 0, agenda.for_stage(processor.stages[1]).count,
-                   'subsequent stage has no barcodes'
+                   'subsequent stage has no objids'
     }
     generate_tests 'update_fatal_error', test_proc
   end

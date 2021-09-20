@@ -69,22 +69,22 @@ end
 tool = QueryTool.new(processor)
 
 COMMANDS = ['agenda', 'barcodes', 'errors', 'exit', 'help', 'ls', 'metadata',
-            'quit', 'run', 'status', '?'].freeze
+            'objects', 'quit', 'run', 'status', '?'].freeze
 COMMAND_SUMMARY = <<~COMMANDS
-  COMMAND            SUMMARY                 ALIAS
-  ==============================================================
-  barcodes           List shipment barcodes  ls
-  errors [BARCODE]   List shipment errors
-  help               Print this message      ?
+  COMMAND            SUMMARY                   ALIAS
+  ==========================================================
+  errors [OBJID]     List shipment errors
+  help               Print this message        ?
   fixity             Show fixity summary
-  quit               Quit the program        exit
+  objects            List shipment object ids  barcodes, ls
+  quit               Quit the program          exit
   run                Run processor
   status             Query shipment status
-  warnings [BARCODE] List shipment warnings
-  ==============================================================
+  warnings [OBJID]   List shipment warnings
+  ===========================================================
 COMMANDS
 
-completions = COMMANDS + processor.shipment.barcodes
+completions = COMMANDS + processor.shipment.objids
 Readline.completion_append_character = ' '
 Readline.completion_proc = proc do |str|
   completions.grep(/^#{Regexp.escape(str)}/)
@@ -97,8 +97,8 @@ begin
       case cmd
       when 'agenda'
         tool.agenda_cmd
-      when 'barcodes', 'ls'
-        tool.barcodes_cmd
+      when 'objects', 'barcodes', 'ls'
+        tool.objids_cmd
       when 'errors'
         tool.errors_cmd(*args)
       when 'help', '?'

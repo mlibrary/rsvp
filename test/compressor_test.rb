@@ -32,11 +32,11 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       stage.run!
       assert_equal(0, stage.errors.count, 'stage runs without errors')
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       assert File.exist?(tiff), '00000001.tif exists'
       jp2 = File.join(shipment.directory,
-                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      shipment.objid_to_path(shipment.objids[0]),
                       '00000002.jp2')
       assert File.exist?(jp2), '00000002.jp2 exists'
     }
@@ -48,7 +48,7 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       stage = Compressor.new(shipment, config: opts.merge(@config))
       stage.send(:write_tiff_date_time, tiff)
@@ -64,13 +64,13 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `tiffset -s 306 '2000:11:11 11:11:11' #{tiff}`
       stage = Compressor.new(shipment, config: opts.merge(@config))
       stage.run!
       jp2 = File.join(shipment.directory,
-                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      shipment.objid_to_path(shipment.objids[0]),
                       '00000001.jp2')
       exif_data = `exiftool #{jp2}`
       assert_match(%r{Date/Time\sModified\s*:\s*2000:11:11\s11:11:11},
@@ -86,9 +86,9 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       stage = Compressor.new(shipment, config: opts.merge(@config))
       stage.run!
       jp2 = File.join(shipment.directory,
-                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      shipment.objid_to_path(shipment.objids[0]),
                       '00000001.jp2')
-      doc_name = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
+      doc_name = File.join(shipment.objid_to_path(shipment.objids[0]),
                            '00000001.jp2')
       exif_data = `exiftool #{jp2}`
       assert_match(/Source\s*:\s*#{Regexp.escape doc_name}/,
@@ -127,7 +127,7 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `convert #{tiff} -alpha on #{tiff}`
       stage = Compressor.new(shipment, config: opts.merge(@config))
@@ -142,7 +142,7 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       profile_path = File.join(Fixtures::TEST_FIXTURES_PATH, 'sRGB2014.icc')
       `convert #{tiff} -profile #{profile_path} #{tiff}`
@@ -158,7 +158,7 @@ class CompressorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `tiffset -s 305 'BOGUS SOFTWARE v1.0' #{tiff}`
       stage = Compressor.new(shipment, config: opts.merge(@config))

@@ -67,8 +67,8 @@ ARGV.each do |arg|
     end
     tool = QueryTool.new(processor)
     status = processor.errors.none? ? 'OK'.green : 'ERRORS'.red
-    objects = tool.pluralize processor.shipment.barcodes.count, 'object'
-    status += " (#{processor.shipment.barcodes.count} #{objects})"
+    objects = tool.pluralize processor.shipment.objids.count, 'object'
+    status += " (#{processor.shipment.objids.count} #{objects})"
     statuses[arg] = status
   rescue JSON::ParserError => e
     statuses[arg] = "Can't parse #{shipment.status_file}: #{e}".red

@@ -47,12 +47,12 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       stage = Preflight.new(shipment, config: opts.merge(@config))
       stage.run!
       FileUtils.rm_r(File.join(shipment.directory,
-                               shipment.barcode_to_path(shipment.barcodes[0])),
+                               shipment.objid_to_path(shipment.objids[0])),
                      force: true)
       stage = Postflight.new(shipment, config: opts.merge(@config))
       stage.run!
       assert stage.errors.any? { |e| /removed/.match? e.to_s },
-             'stage gripes about removed barcode'
+             'stage gripes about removed objid'
     }
     generate_tests 'metadata_mismatch_removed', test_proc
   end
@@ -64,13 +64,13 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = Preflight.new(shipment, config: opts.merge(@config))
       stage.run!
-      new_barcode = test_shipment_class.generate_barcode
+      new_objid = test_shipment_class.generate_objid
       FileUtils.mkdir_p File.join(shipment.directory,
-                                  shipment.barcode_to_path(new_barcode))
+                                  shipment.objid_to_path(new_objid))
       stage = Postflight.new(shipment, config: opts.merge(@config))
       stage.run!
       assert stage.errors.any? { |e| /added/i.match? e.to_s },
-             'stage gripes about added barcode'
+             'stage gripes about added objid'
     }
     generate_tests 'metadata_mismatch_added', test_proc
   end
@@ -81,7 +81,7 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = Preflight.new(shipment, config: opts.merge(@config))
       stage.run!
-      tiff = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
+      tiff = File.join(shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       %w[FAKE_FEED_VALIDATE_FAIL FAKE_NEW_FEED_VALIDATE_FAIL].each do |var|
         ENV[var] = tiff
@@ -123,7 +123,7 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       stage = Preflight.new(shipment, config: opts.merge(@config))
       stage.run!
       tiff = File.join(shipment.source_directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `echo 'test' > #{tiff}`
       stage = Postflight.new(shipment, config: opts.merge(@config))
@@ -141,7 +141,7 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       stage = Preflight.new(shipment, config: opts.merge(@config))
       stage.run!
       tiff = File.join(shipment.source_directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       FileUtils.rm tiff
       stage = Postflight.new(shipment, config: opts.merge(@config))
@@ -159,7 +159,7 @@ class PostflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       stage = Preflight.new(shipment, config: opts.merge(@config))
       stage.run!
       tiff = File.join(shipment.source_directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000003.tif')
       `echo 'test' > #{tiff}`
       stage = Postflight.new(shipment, config: opts.merge(@config))

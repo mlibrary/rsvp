@@ -6,7 +6,7 @@ require 'fixtures'
 require_relative '../lib/shipment'
 
 class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
-  attr_reader :ordered_barcodes
+  attr_reader :ordered_objids
 
   PATH = File.join(__dir__, 'shipments').freeze
 
@@ -27,21 +27,21 @@ class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
     test_shipments << name
   end
 
-  # Randomly-generated barcode that passes Luhn check
-  def self.generate_barcode(valid = true)
-    barcode = '39015' + (8.times.map { rand 10 }).join
+  # Randomly-generated objid that passes Luhn check
+  def self.generate_objid(valid = true)
+    objid = '39015' + (8.times.map { rand 10 }).join
     if valid
-      barcode + Luhn.checksum(barcode).to_s
+      objid + Luhn.checksum(objid).to_s
     else
-      barcode + ((Luhn.checksum(barcode) + 1) % 10).to_s
+      objid + ((Luhn.checksum(objid) + 1) % 10).to_s
     end
   end
 
   # Generate a test directory under test/shipments based on specification
   # spec is a string of opcodes and optional parameters
   # OPCODES
-  # [BC] create barcode directory (and make it current)
-  # [BBC] create bogus barcode directory (and make it current)
+  # [BC] create objid directory (and make it current)
+  # [BBC] create bogus objid directory (and make it current)
   # [TIF name, dest] copy TIF fixture to dest (which can be a range)
   # [F dest] create zero-length file at dest
   # [DIR] cwd to shipment directory
@@ -52,7 +52,7 @@ class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
     FileUtils.rm_r(dir, force: true) if File.directory? dir
     Dir.mkdir(dir)
     super dir
-    @ordered_barcodes = []
+    @ordered_objids = []
     process_spec spec
   end
 
@@ -62,9 +62,9 @@ class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
     while elements.any?
       case op = elements.shift
       when 'BC'
-        handle_barcode_op
+        handle_objid_op
       when 'BBC'
-        handle_bogus_barcode_op
+        handle_bogus_objid_op
       when 'T'
         handle_tiff_op(elements.shift, elements.shift)
       when 'J'
@@ -81,18 +81,18 @@ class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
 
   private
 
-  def handle_barcode_op
-    barcode = self.class.generate_barcode(true)
-    @current_dir = File.join(@dir, barcode)
+  def handle_objid_op
+    objid = self.class.generate_objid(true)
+    @current_dir = File.join(@dir, objid)
     Dir.mkdir(@current_dir)
-    @ordered_barcodes << barcode
+    @ordered_objids << objid
   end
 
-  def handle_bogus_barcode_op
-    barcode = self.class.generate_barcode(false)
-    @current_dir = File.join(@dir, barcode)
+  def handle_bogus_objid_op
+    objid = self.class.generate_objid(false)
+    @current_dir = File.join(@dir, objid)
     Dir.mkdir(@current_dir)
-    @ordered_barcodes << barcode
+    @ordered_objids << objid
   end
 
   def handle_tiff_op(name, dest) # rubocop:disable Metrics/MethodLength
@@ -133,35 +133,35 @@ class TestShipment < Shipment # rubocop:disable Metrics/ClassLength
 end
 
 class DLXSTestShipment < TestShipment
-  # Randomly-generated DLXS id/volume/number "barcode" abcde/XXXX/YYY
-  def self.generate_barcode(valid = true)
-    barcode = [[*('a'..'z'), *('0'..'9')].sample(8).join,
-               4.times.map { rand 10 }.join,
-               3.times.map { rand 10 }.join].join('.')
-    valid ? barcode : barcode.reverse
+  # Randomly-generated DLXS id/volume/number objid abcde/XXXX/YYY
+  def self.generate_objid(valid = true)
+    objid = [[*('a'..'z'), *('0'..'9')].sample(8).join,
+             4.times.map { rand 10 }.join,
+             3.times.map { rand 10 }.join].join('.')
+    valid ? objid : objid.reverse
   end
 
-  def handle_barcode_op
-    barcode = self.class.generate_barcode(true)
-    components = barcode.split '.'
+  def handle_objid_op
+    objid = self.class.generate_objid(true)
+    components = objid.split '.'
     path = @dir
     components.each do |component|
       path = File.join(path, component)
       Dir.mkdir(path)
     end
     @current_dir = path
-    @ordered_barcodes << barcode
+    @ordered_objids << objid
   end
 
-  def handle_bogus_barcode_op
-    barcode = self.class.generate_barcode(false)
-    components = barcode.split '.'
+  def handle_bogus_objid_op
+    objid = self.class.generate_objid(false)
+    components = objid.split '.'
     path = @dir
     components.each do |component|
       path = File.join(path, component)
       Dir.mkdir(path)
     end
     @current_dir = path
-    @ordered_barcodes << barcode
+    @ordered_objids << objid
   end
 end

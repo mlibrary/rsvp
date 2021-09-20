@@ -46,7 +46,7 @@ class JHOVETest < Minitest::Test
   def self.gen_error # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       setup_test(shipment_class, test_shipment_class, dir, opts)
-      tiff = File.join(@shipment.barcode_to_path(@shipment.barcodes[0]),
+      tiff = File.join(@shipment.objid_to_path(@shipment.objids[0]),
                        '00000001.tif')
       %w[FAKE_FEED_VALIDATE_FAIL FAKE_NEW_FEED_VALIDATE_FAIL].each do |var|
         ENV[var] = tiff

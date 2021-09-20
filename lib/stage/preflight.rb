@@ -21,35 +21,35 @@ class Preflight < Stage
   end
 
   def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    shipment.metadata[:initial_barcodes] = shipment.barcodes
+    shipment.metadata[:initial_barcodes] = shipment.objids
     if shipment.metadata[:initial_barcodes].none?
-      add_error Error.new("no barcodes in #{shipment_directory}")
+      add_error Error.new("no objids in #{shipment_directory}")
     end
     @bar.steps = steps agenda
     @bar.next! "validate #{File.split(shipment_directory)[-1]}"
     validate_shipment_directory
-    shipment.setup_source_directory do |barcode|
-      @bar.next! "setup source/#{barcode}"
+    shipment.setup_source_directory do |objid|
+      @bar.next! "setup source/#{objid}"
     end
-    shipment.checksum_source_directory do |barcode|
-      @bar.next! "checksum source/#{barcode}"
+    shipment.checksum_source_directory do |objid|
+      @bar.next! "checksum source/#{objid}"
     end
-    agenda.each do |barcode|
-      err = shipment.validate_barcode barcode
-      add_warning Error.new(err, barcode) unless err.nil?
-      @bar.next! "validate #{barcode}"
-      validate_barcode_directory barcode
+    agenda.each do |objid|
+      err = shipment.validate_objid objid
+      add_warning Error.new(err, objid) unless err.nil?
+      @bar.next! "validate #{objid}"
+      validate_objid_directory objid
     end
   end
 
   private
 
   def steps(agenda)
-    1 + shipment.barcodes.count + agenda.count +
-      (File.directory?(source_directory) ? 0 : shipment.barcodes.count)
+    1 + shipment.objids.count + agenda.count +
+      (File.directory?(source_directory) ? 0 : shipment.objids.count)
   end
 
-  # A shipment directory is valid if it contains only barcode directories,
+  # A shipment directory is valid if it contains only objid directories,
   # a source directory, and status.json
   def validate_shipment_directory # rubocop:disable Metrics/MethodLength
     Dir.entries(shipment_directory).sort.each do |entry|
@@ -67,29 +67,29 @@ class Preflight < Stage
     end
   end
 
-  # Barcode directory must include one or more TIFF files,
+  # objid directory must include one or more TIFF files,
   # and a few other exceptions grandfathered by just_do_everything.sh
   # No directories are allowed
-  def validate_barcode_directory(barcode) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  def validate_objid_directory(objid) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     have_tiff = false
-    barcode_directory = shipment.barcode_directory(barcode)
-    Dir.entries(barcode_directory).sort.each do |entry|
+    objid_directory = shipment.objid_directory(objid)
+    Dir.entries(objid_directory).sort.each do |entry|
       next if %w[. ..].include? entry
 
-      path = File.join(barcode_directory, entry)
+      path = File.join(objid_directory, entry)
       if File.directory? path
-        add_error Error.new("illegal barcode subdirectory '#{entry}'", barcode)
+        add_error Error.new("illegal objid subdirectory '#{entry}'", objid)
       elsif self.class::TIFF_REGEX.match? entry
         have_tiff = true
       elsif self.class.ignorable_files.include? entry
-        add_warning Error.new('file ignored', barcode, entry)
+        add_warning Error.new('file ignored', objid, entry)
       elsif self.class.removable_files.include? entry
-        add_warning Error.new('file deleted', barcode, entry)
+        add_warning Error.new('file deleted', objid, entry)
         delete_on_success path
       else
-        add_error Error.new('unknown file', barcode, entry)
+        add_error Error.new('unknown file', objid, entry)
       end
     end
-    add_error Error.new('no TIFF files found', barcode) unless have_tiff
+    add_error Error.new('no TIFF files found', objid) unless have_tiff
   end
 end
