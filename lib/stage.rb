@@ -78,7 +78,7 @@ class Stage # rubocop:disable Metrics/ClassLength
 
   def run!(agenda = nil)
     @start = Time.now
-    agenda = shipment.barcodes if agenda.nil?
+    agenda = shipment.objids if agenda.nil?
     @bar.steps = agenda.count
     run agenda
     cleanup
@@ -93,8 +93,8 @@ class Stage # rubocop:disable Metrics/ClassLength
 
   def add_error(err)
     raise "#{err.class} passed to add_error" unless err.is_a? Error
-    unless err.barcode.nil? || barcodes.member?(err.barcode)
-      raise "unknown error barcode #{err.barcode}"
+    unless err.objid.nil? || objids.member?(err.objid)
+      raise "unknown error objid #{err.objid}"
     end
 
     @bar.error = true
@@ -103,53 +103,53 @@ class Stage # rubocop:disable Metrics/ClassLength
 
   def add_warning(err)
     raise "#{err.class} passed to add_warning" unless err.is_a? Error
-    unless err.barcode.nil? || barcodes.member?(err.barcode)
-      raise "unknown warning barcode #{err.barcode}"
+    unless err.objid.nil? || objids.member?(err.objid)
+      raise "unknown warning objid #{err.objid}"
     end
 
     @bar.warning = true
     @warnings << err
   end
 
-  # Map of barcodes + nil -> [Errors]
-  # Does not include barcodes with no errors
-  def errors_by_barcode
+  # Map of objids + nil -> [Errors]
+  # Does not include objids with no errors
+  def errors_by_objid
     errors.each_with_object({}) do |err, memo|
-      (memo[err.barcode] ||= []) << err
+      (memo[err.objid] ||= []) << err
     end
   end
 
-  # Map of barcodes + nil -> [Errors]
-  # Does not include barcodes with no warnings
-  def warnings_by_barcode
+  # Map of objids + nil -> [Errors]
+  # Does not include objids with no warnings
+  def warnings_by_objid
     warnings.each_with_object({}) do |err, memo|
-      (memo[err.barcode] ||= []) << err
+      (memo[err.objid] ||= []) << err
     end
   end
 
-  def error_barcodes
-    errors_by_barcode.keys.compact
+  def error_objids
+    errors_by_objid.keys.compact
   end
 
-  # Any error with barcode == nil is fatal.
+  # Any error with objid == nil is fatal.
   def fatal_error?
-    errors_by_barcode.key? nil
+    errors_by_objid.key? nil
   end
 
-  def delete_errors_for_barcode(barcode)
-    @errors.delete_if { |err| err.barcode == barcode }
+  def delete_errors_for_objid(objid)
+    @errors.delete_if { |err| err.objid == objid }
   end
 
-  def delete_warnings_for_barcode(barcode)
-    @warnings.delete_if { |err| err.barcode == barcode }
+  def delete_warnings_for_objid(objid)
+    @warnings.delete_if { |err| err.objid == objid }
   end
 
-  # OK to make destructive changes to the shipment for this barcode?
-  # With nil barcode checks for presence of any error.
-  def make_changes?(barcode = nil)
-    return @errors.none? if barcode.nil?
+  # OK to make destructive changes to the shipment for this objid?
+  # With nil objid checks for presence of any error.
+  def make_changes?(objid = nil)
+    return @errors.none? if objid.nil?
 
-    @errors.none? { |err| err.barcode == barcode || err.barcode.nil? }
+    @errors.none? { |err| err.objid == objid || err.objid.nil? }
   end
 
   # True if the stage has been run and all possible errors have
@@ -171,7 +171,7 @@ class Stage # rubocop:disable Metrics/ClassLength
 
     while @copy_on_success.any?
       copy = @copy_on_success.pop
-      if make_changes? copy[:barcode]
+      if make_changes? copy[:objid]
         FileUtils.cp copy[:source], copy[:destination]
       end
     end
@@ -181,7 +181,7 @@ class Stage # rubocop:disable Metrics/ClassLength
     return if @delete_on_success.nil? || !make_changes?
 
     @delete_on_success.each do |del|
-      FileUtils.rm del[:path] if make_changes? del[:barcode]
+      FileUtils.rm del[:path] if make_changes? del[:objid]
     end
     @delete_on_success = nil
   end
@@ -207,17 +207,17 @@ class Stage # rubocop:disable Metrics/ClassLength
 
   # source is copied to destination on success,
   # left alone on failure.
-  def copy_on_success(source, destination, barcode)
+  def copy_on_success(source, destination, objid)
     (@copy_on_success ||= []) << { source: source, destination: destination,
-                                   barcode: barcode }
+                                   objid: objid }
   end
 
-  def delete_on_success(path, barcode = nil)
-    (@delete_on_success ||= []) << { path: path, barcode: barcode }
+  def delete_on_success(path, objid = nil)
+    (@delete_on_success ||= []) << { path: path, objid: objid }
   end
 
-  def barcodes
-    @barcodes ||= shipment.barcodes
+  def objids
+    @objids ||= shipment.objids
   end
 
   def log(entry, time = nil)
@@ -233,8 +233,8 @@ class Stage # rubocop:disable Metrics/ClassLength
     shipment.source_directory
   end
 
-  def barcode_directories
-    shipment.barcode_directories
+  def objid_directories
+    shipment.objid_directories
   end
 
   def image_files(type = 'tif')

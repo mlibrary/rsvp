@@ -8,25 +8,25 @@ class PaginationCheck < Stage
   IMAGE_FILE_RE = /^([0-9]{8})\.(?:tif|jp2)$/.freeze
 
   def run(agenda)
-    agenda.each do |barcode|
-      @bar.next! barcode
-      find_barcode_errors barcode
+    agenda.each do |objid|
+      @bar.next! objid
+      find_objid_errors objid
     end
   end
 
   private
 
-  def find_barcode_errors(barcode)
-    dir = @shipment.barcode_directory barcode
+  def find_objid_errors(objid)
+    dir = @shipment.objid_directory objid
     pages = pages_in_dir(dir)
     missing = missing_pages(pages)
     if missing.count.positive?
-      add_error Error.new("missing pages {#{missing.join(', ')}}", barcode)
+      add_error Error.new("missing pages {#{missing.join(', ')}}", objid)
     end
     duplicate = duplicate_pages(pages)
     return unless duplicate.count.positive?
 
-    add_error Error.new("duplicate pages {#{duplicate.join(', ')}}", barcode)
+    add_error Error.new("duplicate pages {#{duplicate.join(', ')}}", objid)
   end
 
   def pages_in_dir(dir)

@@ -31,13 +31,13 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     generate_tests 'directory', test_proc
   end
 
-  def self.gen_path_components_from_barcode # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def self.gen_path_components_from_objid # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, _opts|
       test_shipment = test_shipment_class.new(dir, 'BC')
       shipment = shipment_class.new(test_shipment.directory)
-      components = shipment.barcode_to_path(shipment.barcodes[0])
+      components = shipment.objid_to_path(shipment.objids[0])
       assert_equal components.count, shipment_class::PATH_COMPONENTS,
-                   'barcode path component count = PATH_COMPONENTS'
+                   'objid path component count = PATH_COMPONENTS'
       path = [shipment.directory]
       while (component = components.shift)
         path << component
@@ -45,7 +45,7 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
                "#{File.join(path)} is a directory"
       end
     }
-    generate_tests 'barcode_to_path', test_proc
+    generate_tests 'objid_to_path', test_proc
   end
 
   def self.gen_source_directory # rubocop:disable Metrics/MethodLength
@@ -76,16 +76,16 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     generate_tests 'tmp_directory', test_proc
   end
 
-  def self.gen_source_barcodes
+  def self.gen_source_objids
     test_proc = proc { |shipment_class, test_shipment_class, dir, _opts|
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
       shipment.setup_source_directory
-      assert_equal shipment.barcodes[0],
-                   shipment.source_barcodes[0],
-                   'barcode and source barcode are the same'
+      assert_equal shipment.objids[0],
+                   shipment.source_objids[0],
+                   'objid and source objid are the same'
     }
-    generate_tests 'source_barcodes', test_proc
+    generate_tests 'source_objids', test_proc
   end
 
   def self.gen_image_files # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -96,7 +96,7 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       files = shipment.image_files
       assert_equal 3, files.count, '3 image files'
       assert_kind_of ImageFile, files[0], 'produces ImageFile'
-      refute_nil files[0].barcode, 'ImageFile barcode is not nil'
+      refute_nil files[0].objid, 'ImageFile objid is not nil'
       refute_nil files[0].path, 'ImageFile path is not nil'
     }
     generate_tests 'image_files', test_proc
@@ -108,12 +108,12 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       shipment.setup_source_directory
       path = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]))
-      assert File.directory?(path), 'source/barcode directory created'
+                       shipment.objid_to_path(shipment.objids[0]))
+      assert File.directory?(path), 'source/objid directory created'
       path = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
-      assert File.exist?(path), 'source/barcode/00000001.tif created'
+      assert File.exist?(path), 'source/objid/00000001.tif created'
     }
     generate_tests 'setup_source_directory', test_proc
   end
@@ -124,7 +124,7 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       shipment.setup_source_directory
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       tiff_size = File.size tiff
       `/bin/echo -n 'test' > #{tiff}`
@@ -143,15 +143,15 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       shipment.setup_source_directory
       tiff0 = File.join(shipment.directory,
-                        shipment.barcode_to_path(shipment.barcodes[0]),
+                        shipment.objid_to_path(shipment.objids[0]),
                         '00000001.tif')
       tiff0_size = File.size tiff0
       `/bin/echo -n 'test' > #{tiff0}`
       tiff1 = File.join(shipment.directory,
-                        shipment.barcode_to_path(shipment.barcodes[1]),
+                        shipment.objid_to_path(shipment.objids[1]),
                         '00000001.tif')
       `/bin/echo -n 'test' > #{tiff1}`
-      shipment.restore_from_source_directory [shipment.barcodes[0]]
+      shipment.restore_from_source_directory [shipment.objids[0]]
       assert_equal tiff0_size, File.size(tiff0),
                    'TIFF file in restored directory at original size'
       assert_equal 4, File.size(tiff1),
@@ -179,33 +179,33 @@ class ShipmentTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment.checksum_source_directory
       # Add 00000001.tif, change 00000002.tif, and remove 00000003.tif
       tiff1 = File.join(shipment.source_directory,
-                        shipment.barcode_to_path(shipment.barcodes[0]),
+                        shipment.objid_to_path(shipment.objids[0]),
                         '00000001.tif')
       refute File.exist?(tiff1), '(make sure 00000001.tif does not exist)'
       `/bin/echo -n 'test' > #{tiff1}`
       tiff2 = File.join(shipment.source_directory,
-                        shipment.barcode_to_path(shipment.barcodes[0]),
+                        shipment.objid_to_path(shipment.objids[0]),
                         '00000002.tif')
       `/bin/echo -n 'test' > #{tiff2}`
       tiff3 = File.join(shipment.source_directory,
-                        shipment.barcode_to_path(shipment.barcodes[0]),
+                        shipment.objid_to_path(shipment.objids[0]),
                         '00000003.tif')
       FileUtils.rm tiff3
       fixity = shipment.fixity_check
       assert_equal 1, fixity[:added].count, 'one file added'
-      barcode_file = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
-                               '00000001.tif')
-      assert_equal barcode_file, fixity[:added][0].barcode_file,
+      objid_file = File.join(shipment.objid_to_path(shipment.objids[0]),
+                             '00000001.tif')
+      assert_equal objid_file, fixity[:added][0].objid_file,
                    '00000001.tif added'
       assert_equal 1, fixity[:changed].count, 'one file changed'
-      barcode_file = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
-                               '00000002.tif')
-      assert_equal barcode_file, fixity[:changed][0].barcode_file,
+      objid_file = File.join(shipment.objid_to_path(shipment.objids[0]),
+                             '00000002.tif')
+      assert_equal objid_file, fixity[:changed][0].objid_file,
                    '00000002.tif changed'
       assert_equal 1, fixity[:removed].count, 'one file changed'
-      barcode_file = File.join(shipment.barcode_to_path(shipment.barcodes[0]),
-                               '00000003.tif')
-      assert_equal barcode_file, fixity[:removed][0].barcode_file,
+      objid_file = File.join(shipment.objid_to_path(shipment.objids[0]),
+                             '00000003.tif')
+      assert_equal objid_file, fixity[:removed][0].objid_file,
                    '00000003.tif removed'
     }
     generate_tests 'fixity_check', test_proc

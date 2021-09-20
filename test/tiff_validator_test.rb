@@ -51,7 +51,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = TIFFValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `convert #{tiff} -units PixelsPerCentimeter #{tiff}`
       stage.run!
@@ -67,7 +67,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = TIFFValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `tiffset -s 277 '3' #{tiff}`
       stage.run!
@@ -83,7 +83,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = TIFFValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
       stage.run!
@@ -99,7 +99,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = TIFFValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `tiffset -s 277 '2' #{tiff}`
       stage.run!
@@ -115,7 +115,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = TIFFValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `convert #{tiff} -density 100x100 -units pixelsperinch #{tiff}`
       stage.run!
@@ -131,7 +131,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       shipment = shipment_class.new(test_shipment.directory)
       stage = TIFFValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       `/bin/echo -n 'test' > #{tiff}`
       stage.run!

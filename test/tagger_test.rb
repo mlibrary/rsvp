@@ -48,7 +48,7 @@ class TaggerTest < Minitest::Test
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       config = Config.new({ no_progress: true, tagger_artist: 'bentley' })
       stage = Tagger.new(shipment, config: config.merge(opts))
@@ -64,7 +64,7 @@ class TaggerTest < Minitest::Test
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       config = Config.new({ no_progress: true, tagger_scanner: 'copibookv' })
       stage = Tagger.new(shipment, config: config.merge(opts))
@@ -83,7 +83,7 @@ class TaggerTest < Minitest::Test
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       config = Config.new({ no_progress: true, tagger_software: 'limb' })
       stage = Tagger.new(shipment, config: config.merge(opts))
@@ -118,7 +118,7 @@ class TaggerCustomTagTest < Minitest::Test
       assert stage.warnings.any? { |e| /custom\sartist/i.match? e.to_s },
              'warns about custom artist string'
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       info = `tiffinfo #{tiff}`
       assert_match("Artist: #{artist}", info, 'tiffinfo has custom artist tag')
@@ -138,7 +138,7 @@ class TaggerCustomTagTest < Minitest::Test
       assert stage.warnings.any? { |e| /custom\sscanner/i.match? e.to_s },
              'warns about custom scanner string'
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       info = `tiffinfo #{tiff}`
       assert_match('Make: Scans-R-Us', info,
@@ -175,7 +175,7 @@ class TaggerCustomTagTest < Minitest::Test
       assert stage.warnings.any? { |e| /custom\ssoftware/i.match? e.to_s },
              'warns about custom software string'
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       info = `tiffinfo #{tiff}`
       assert_match("Software: #{software}", info,

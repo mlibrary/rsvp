@@ -35,7 +35,7 @@ class ErrorTest < Minitest::Test
     err2 = JSON.load(err.to_json)
     # rubocop:enable Security/JSONLoad
     assert err.description == err2.description &&
-           err.barcode == err2.barcode &&
+           err.objid == err2.objid &&
            err.path == err2.path,
            'JSON round trip'
   end

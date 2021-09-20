@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'stage'
+require 'tiff'
 
 JP2_LEVEL_MIN = 5
 JP2_LAYERS = 8
@@ -18,35 +19,35 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
   def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
     return unless agenda.any?
 
-    files = image_files.select { |file| agenda.include? file.barcode }
+    files = image_files.select { |file| agenda.include? file.objid }
     @bar.steps = files.count
     files.each_with_index do |image_file, i|
       begin
         tiffinfo = TIFF.new(image_file.path).info
       rescue StandardError => e
-        add_error Error.new(e.message, image_file.barcode, image_file.file)
+        add_error Error.new(e.message, image_file.objid, image_file.file)
         next
       end
       case tiffinfo[:bps]
       when 8
         # It's a contone, so we convert to JP2.
-        @bar.step! i, "#{image_file.barcode_file} JP2"
+        @bar.step! i, "#{image_file.objid_file} JP2"
         begin
           handle_8_bps_conversion(image_file, tiffinfo)
         rescue StandardError => e
-          add_error Error.new(e.message, image_file.barcode, image_file.file)
+          add_error Error.new(e.message, image_file.objid, image_file.file)
         end
       when 1
         # It's bitonal, so we G4 compress it.
-        @bar.step! i, "#{image_file.barcode_file} G4"
+        @bar.step! i, "#{image_file.objid_file} G4"
         begin
           handle_1_bps_conversion(image_file, tiffinfo)
         rescue StandardError => e
-          add_error Error.new(e.message, image_file.barcode, image_file.file)
+          add_error Error.new(e.message, image_file.objid, image_file.file)
         end
       else
         add_error Error.new("invalid source TIFF BPS #{tiffinfo[:bps]}",
-                            image_file.barcode, image_file.file)
+                            image_file.objid, image_file.file)
       end
     end
   end
@@ -59,7 +60,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     new_image = File.join(tmpdir, 'new.jp2')
     final_image_name = File.basename(image_file.path, '.*') + '.jp2'
     final_image = File.join(File.dirname(image_file.path), final_image_name)
-    document_name = File.join(shipment.barcode_to_path(image_file.barcode),
+    document_name = File.join(shipment.objid_to_path(image_file.objid),
                               final_image_name)
 
     # We don't want any XMP metadata to be copied over on its own. If
@@ -91,8 +92,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # the XMP data needs to reflect that (previously, we were
     # taking that info from the original image).
     copy_jp2_alphaless_metadata(sparse, new_image) if tiffinfo[:alpha]
-    copy_on_success new_image, final_image, image_file.barcode
-    delete_on_success image_file.path, image_file.barcode
+    copy_on_success new_image, final_image, image_file.objid
+    delete_on_success image_file.path, image_file.objid
   end
 
   def jp2_clevels(tiffinfo)
@@ -124,7 +125,7 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
       status = Command.new(cmd).run
     rescue StandardError => e
       warning = "couldn't remove ICC profile (#{cmd}) (#{e.message})"
-      add_warning Error.new(warning, barcode_from_path(path), path)
+      add_warning Error.new(warning, objid_from_path(path), path)
     else
       log cmd, status[:time]
       FileUtils.mv(tmp, path)
@@ -202,10 +203,10 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     if tiffinfo[:software]
       write_tiff_software(page1, tiffinfo[:software])
     else
-      add_warning Error.new('could not extract software', image_file.barcode,
+      add_warning Error.new('could not extract software', image_file.objid,
                             image_file.path)
     end
-    copy_on_success page1, image_file.path, image_file.barcode
+    copy_on_success page1, image_file.path, image_file.objid
   end
 
   # Try to compress the image. This is the only part of this step
@@ -241,11 +242,11 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     log cmd, status[:time]
   end
 
-  # Set the document name with barcode/image.tif
+  # Set the document name with objid/image.tif
   def write_tiff_document_name(image_file, destination)
-    cmd = "tiffset -s 269 '#{image_file.barcode_file}' #{destination}"
-    status = Command.new(cmd).run
-    log cmd, status[:time]
+    tiff = TIFF.new(destination)
+    tiffset = tiff.set(TIFF::TIFFTAG_DOCUMENTNAME, image_file.objid_file)
+    log tiffset[:cmd], tiffset[:time]
   end
 
   # Remove ImageMagick software tag (if it exists) and replace with original

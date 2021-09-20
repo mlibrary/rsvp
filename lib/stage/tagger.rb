@@ -15,10 +15,10 @@ class Tagger < Stage
     calculate_tags
     return if errors.count.positive?
 
-    files = image_files.select { |file| agenda.include? file.barcode }
+    files = image_files.select { |file| agenda.include? file.objid }
     @bar.steps = files.count
     files.each_with_index do |image_file, i|
-      @bar.step! i, image_file.barcode_file
+      @bar.step! i, image_file.objid_file
       tag image_file
     end
   end
@@ -61,12 +61,12 @@ class Tagger < Stage
   def tag(image_file) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     tagged_name = image_file.path.split(File::SEPARATOR)[-1] + '.tagged'
     tagged_path = File.join(tempdir_for_file(image_file), tagged_name)
-    tagged = ImageFile.new(image_file.barcode, tagged_path,
-                           File.join(image_file.barcode,
+    tagged = ImageFile.new(image_file.objid, tagged_path,
+                           File.join(image_file.objid,
                                      image_file.path + '.tagged'),
                            image_file.file)
     FileUtils.cp(image_file.path, tagged_path)
-    copy_on_success(tagged_path, image_file.path, image_file.barcode)
+    copy_on_success(tagged_path, image_file.path, image_file.objid)
     tag_artist tagged
     tag_scanner tagged
     tag_software tagged
@@ -93,27 +93,27 @@ class Tagger < Stage
   end
 
   def tempdir_for_file(image_file)
-    @barcode_to_tempdir = {} if @barcode_to_tempdir.nil?
-    if @barcode_to_tempdir.key? image_file.barcode
-      return @barcode_to_tempdir[image_file.barcode]
+    @objid_to_tempdir = {} if @objid_to_tempdir.nil?
+    if @objid_to_tempdir.key? image_file.objid
+      return @objid_to_tempdir[image_file.objid]
     end
 
-    @barcode_to_tempdir[image_file.barcode] = create_tempdir
+    @objid_to_tempdir[image_file.objid] = create_tempdir
   end
 
   def run_tiffset(image_file, tag, value) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     begin
       info = TIFF.new(image_file.path).set(tag, value)
     rescue StandardError => e
-      add_error Error.new(e.message, image_file.barcode, image_file.file)
+      add_error Error.new(e.message, image_file.objid, image_file.file)
       return
     end
     log info[:cmd], info[:time]
     info[:warnings].each do |err|
-      add_warning Error.new(err, image_file.barcode, image_file.file)
+      add_warning Error.new(err, image_file.objid, image_file.file)
     end
     info[:errors].each do |err|
-      add_error Error.new(err, image_file.barcode, image_file.file)
+      add_error Error.new(err, image_file.objid, image_file.file)
     end
   end
 end

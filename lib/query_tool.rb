@@ -19,13 +19,13 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     if processor.agenda.any?
       processor.stages.each do |stage|
         puts stage.name.bold
-        barcodes_for_stage = processor.agenda.for_stage(stage)
-        if (Set.new(processor.shipment.barcodes) -
-            Set.new(barcodes_for_stage)).empty?
-          puts '  (all barcodes)'.italic
+        objids_for_stage = processor.agenda.for_stage(stage)
+        if (Set.new(processor.shipment.objids) -
+            Set.new(objids_for_stage)).empty?
+          puts '  (all objids)'.italic
         else
-          barcodes_for_stage.each do |barcode|
-            puts "  #{barcode}".italic
+          objids_for_stage.each do |objid|
+            puts "  #{objid}".italic
           end
         end
       end
@@ -34,42 +34,50 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def barcodes_cmd
-    errs = processor.errors_by_barcode_by_stage
-    processor.shipment.barcodes.each do |barcode|
-      line = barcode.bold
-      line += " #{'ERROR'.red}" if errs[barcode]
+  def objids_cmd
+    errs = processor.errors_by_objid_by_stage
+    processor.shipment.objids.each do |objid|
+      line = objid.bold
+      line += " #{'ERROR'.red}" if errs[objid]
       puts line
     end
   end
 
   def errors_cmd(*args) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
-    errs = processor.errors_by_barcode_by_stage
-    errs.each_key do |barcode|
-      next if args.count.positive? && !args.include?(barcode)
+    errs = processor.errors_by_objid_by_stage
+    errs.each_key do |objid|
+      next if args.count.positive? && !args.include?(objid)
 
-      puts (barcode.nil? ? '(General)' : barcode).bold
-      errs[barcode].each_key.each do |stage|
+      puts (objid.nil? ? '(General)' : objid).bold
+      errs[objid].each_key.each do |stage|
         puts stage.brown
-        errs[barcode][stage].each do |err|
-          puts "  #{'File'.bold}\t#{err.path}" unless err.path.nil?
-          puts "  #{'Error'.bold}\t#{err.description.italic}"
+        errs[objid][stage].each do |err|
+          unless err.path.nil?
+            printf "  %<label>-18s %<path>s\n", { label: 'File'.bold,
+                                                  path: err.path }
+          end
+          printf "  %<label>-18s %<desc>s\n", { label: 'Error'.bold,
+                                                desc: err.description.italic }
         end
       end
     end
   end
 
   def warnings_cmd(*args) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
-    warnings = processor.warnings_by_barcode_by_stage
-    warnings.each_key do |barcode|
-      next if args.count.positive? && !args.include?(barcode)
+    warnings = processor.warnings_by_objid_by_stage
+    warnings.each_key do |objid|
+      next if args.count.positive? && !args.include?(objid)
 
-      puts (barcode.nil? ? '(General)' : barcode).bold
-      warnings[barcode].each_key.each do |stage|
+      puts (objid.nil? ? '(General)' : objid).bold
+      warnings[objid].each_key.each do |stage|
         puts stage.brown
-        warnings[barcode][stage].each do |err|
-          puts "  #{'File'.bold}\t#{err.path}" unless err.path.nil?
-          puts "  #{'Warning'.bold}\t#{err.description.italic}"
+        warnings[objid][stage].each do |err|
+          unless err.path.nil?
+            printf "  %<label>-18s %<path>s\n", { label: 'File'.bold,
+                                                  path: err.path }
+          end
+          printf "  %<label>-18s %<desc>s\n", { label: 'Warning'.bold,
+                                                desc: err.description.italic }
         end
       end
     end
@@ -93,7 +101,7 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     bar.steps = processor.shipment.source_image_files.count +
                 processor.shipment.checksums.keys.count
     fixity = processor.shipment.fixity_check do |image_file|
-      bar.next! image_file.barcode_file
+      bar.next! image_file.objid_file
     end
     bar.done!
     puts "Source directory changes: #{fixity[:added].count} added," \
@@ -104,7 +112,7 @@ class QueryTool # rubocop:disable Metrics/ClassLength
 
       puts params[0].to_s.capitalize.send params[1]
       fixity[params[0]].each do |image_file|
-        puts "  #{image_file.barcode_file}".italic
+        puts "  #{image_file.objid_file}".italic
       end
     end
   end
@@ -135,11 +143,11 @@ class QueryTool # rubocop:disable Metrics/ClassLength
 
   def status_detail(stage) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     statuses = []
-    bad = stage.error_barcodes.count
-    total = stage.barcodes.count
+    bad = stage.error_objids.count
+    total = stage.objids.count
     errors = stage.errors.count
     if bad.positive?
-      statuses << "#{bad}/#{total} #{pluralize(total, 'barcode')} failed"
+      statuses << "#{bad}/#{total} #{pluralize(total, 'objid')} failed"
       statuses << "#{errors} #{pluralize(errors, 'error').red}"
     end
     warnings = stage.warnings.count

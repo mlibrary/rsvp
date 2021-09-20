@@ -61,8 +61,8 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       capture_io do
         processor.run
       end
-      errs = processor.errors['Preflight'][processor.shipment.barcodes[0]]
-      warnings = processor.warnings['Preflight'][processor.shipment.barcodes[0]]
+      errs = processor.errors['Preflight'][processor.shipment.objids[0]]
+      warnings = processor.warnings['Preflight'][processor.shipment.objids[0]]
       assert errs.any? { |e| /no.TIFF/i.match? e.to_s },
              'Preflight fails with no TIFFs error'
       assert warnings.any? { |e| /\.DS_Store/.match? e.to_s },
@@ -95,7 +95,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       end
       processor.write_status_file
       processor = Processor.new(test_shipment.directory, opts.merge(@options))
-      errs = processor.errors['TIFF Validator'][processor.shipment.barcodes[0]]
+      errs = processor.errors['TIFF Validator'][processor.shipment.objids[0]]
       assert_kind_of Error, errs[0],
                      'Error class reconstituted from status.json'
     }
@@ -113,8 +113,8 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       FileUtils.copy_entry(test_shipment.directory, shipment_copy_dir)
       FileUtils.rm_r(test_shipment.directory, force: true)
       processor = Processor.new(shipment_copy_dir, opts.merge(@options))
-      assert_equal 1, processor.shipment.barcodes.count,
-                   'relocated shipment can access its barcodes'
+      assert_equal 1, processor.shipment.objids.count,
+                   'relocated shipment can access its objids'
       FileUtils.rm_r(shipment_copy_dir, force: true)
     }
     generate_tests 'move_status_file', test_proc
@@ -126,7 +126,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       processor = Processor.new(test_shipment.directory, opts.merge(@options))
       shipment = processor.shipment
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       old_hash = Digest::SHA256.file(tiff).hexdigest
       shipment.setup_source_directory
@@ -217,12 +217,12 @@ class ProcessorErrorCorrectionTest < Minitest::Test
         processor.run
       end
       refute processor.errors.none?, 'error detected'
-      bad_barcode = test_shipment.ordered_barcodes[1]
-      tiff = File.join(processor.shipment.barcode_to_path(bad_barcode),
+      bad_objid = test_shipment.ordered_objids[1]
+      tiff = File.join(processor.shipment.objid_to_path(bad_objid),
                        '00000001.tif')
       old_checksum = processor.shipment.checksums[tiff]
       fixture = Fixtures.tiff_fixture('contone')
-      dest = File.join(processor.shipment.source_barcode_directory(bad_barcode),
+      dest = File.join(processor.shipment.source_objid_directory(bad_objid),
                        '00000001.tif')
       FileUtils.cp fixture, dest
       capture_io do

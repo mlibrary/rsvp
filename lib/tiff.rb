@@ -5,6 +5,7 @@ require 'command'
 
 # TIFF Validation Stage
 class TIFF
+  TIFFTAG_DOCUMENTNAME = 269
   TIFFTAG_MAKE = 271
   TIFFTAG_MODEL = 272
   TIFFTAG_ORIENTATION = 274

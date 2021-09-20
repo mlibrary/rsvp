@@ -9,7 +9,7 @@ require 'luhn'
 class FinalizedShipmentError < StandardError
 end
 
-ImageFile = Struct.new(:barcode, :path, :barcode_file, :file)
+ImageFile = Struct.new(:objid, :path, :objid_file, :file)
 
 # Shipment directory class
 class Shipment # rubocop:disable Metrics/ClassLength
@@ -79,7 +79,7 @@ class Shipment # rubocop:disable Metrics/ClassLength
     @tmp_directory ||= File.join @dir, 'tmp'
   end
 
-  def path_to_barcode(path_components)
+  def path_to_objid(path_components)
     if path_components.count != self.class::PATH_COMPONENTS
       raise "WARNING: #{self.class} is not designed for path components" \
             " other than #{self.class::PATH_COMPONENTS} (#{path_components})"
@@ -88,49 +88,49 @@ class Shipment # rubocop:disable Metrics/ClassLength
     path_components.join self.class::OBJID_SEPARATOR
   end
 
-  def barcode_to_path(barcode)
-    barcode.split self.class::OBJID_SEPARATOR
+  def objid_to_path(objid)
+    objid.split self.class::OBJID_SEPARATOR
   end
 
-  def barcode_directories
-    barcodes.map { |barcode| barcode_directory barcode }
+  def objid_directories
+    objids.map { |objid| objid_directory objid }
   end
 
-  def barcodes
-    find_barcodes
+  def objids
+    find_objids
   end
 
-  def barcode_directory(barcode)
-    File.join(@dir, barcode_to_path(barcode))
+  def objid_directory(objid)
+    File.join(@dir, objid_to_path(objid))
   end
 
-  def source_barcode_directories
-    source_barcodes.map { |barcode| source_barcode_directory barcode }
+  def source_objid_directories
+    source_objids.map { |objid| source_objid_directory objid }
   end
 
-  def source_barcodes
-    find_barcodes source_directory
+  def source_objids
+    find_objids source_directory
   end
 
-  def source_barcode_directory(barcode)
-    File.join(source_directory, barcode_to_path(barcode))
+  def source_objid_directory(objid)
+    File.join(source_directory, objid_to_path(objid))
   end
 
   # Returns an error message or nil
-  def validate_barcode(barcode)
-    Luhn.valid?(barcode) ? nil : 'Luhn checksum failed'
+  def validate_objid(objid)
+    Luhn.valid?(objid) ? nil : 'Luhn checksum failed'
   end
 
   def image_files(type = 'tif', dir = @dir) # rubocop:disable Metrics/MethodLength
     files = []
-    find_barcodes(dir).each do |barcode|
-      barcode_path = barcode_to_path barcode
-      barcode_dir = File.join(dir, barcode_path)
-      self.class.directory_entries(barcode_dir).sort.each do |entry|
+    find_objids(dir).each do |objid|
+      objid_path = objid_to_path objid
+      objid_dir = File.join(dir, objid_path)
+      self.class.directory_entries(objid_dir).sort.each do |entry|
         next unless entry.end_with? type
 
-        files << ImageFile.new(barcode, File.join(barcode_dir, entry),
-                               File.join(barcode_path, entry), entry)
+        files << ImageFile.new(objid, File.join(objid_dir, entry),
+                               File.join(objid_path, entry), entry)
       end
     end
     files
@@ -152,27 +152,27 @@ class Shipment # rubocop:disable Metrics/ClassLength
     return if File.exist? source_directory
 
     Dir.mkdir source_directory
-    barcodes.each do |barcode|
-      next unless File.directory? barcode_directory(barcode)
+    objids.each do |objid|
+      next unless File.directory? objid_directory(objid)
 
-      yield barcode if block_given?
-      components = barcode_to_path barcode
+      yield objid if block_given?
+      components = objid_to_path objid
       FileUtils.copy_entry(File.join(@dir, components[0]),
                            File.join(source_directory, components[0]))
     end
   end
 
-  # Copy clean or remediated barcode directories from source.
-  # Called with nil to replaces all barcodes, or an Array of barcodes.
-  def restore_from_source_directory(barcode_array = nil) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  # Copy clean or remediated objid directories from source.
+  # Called with nil to replaces all objids, or an Array of objids.
+  def restore_from_source_directory(objid_array = nil) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     raise FinalizedShipmentError if finalized?
     unless File.directory? source_directory
       raise Errno::ENOENT, "source directory #{source_directory} not found"
     end
 
-    (barcode_array || source_barcodes).each do |barcode|
-      yield barcode if block_given?
-      components = barcode_to_path barcode
+    (objid_array || source_objids).each do |objid|
+      yield objid if block_given?
+      components = objid_to_path objid
       dest = File.join(@dir, components[0])
       FileUtils.rm_r(dest, force: true) if File.exist? dest
       FileUtils.copy_entry(File.join(source_directory, components[0]), dest)
@@ -199,18 +199,16 @@ class Shipment # rubocop:disable Metrics/ClassLength
     Digest::SHA256.file(image_file.path).hexdigest
   end
 
-  # Add SHA256 entries to metadata for each source/barcode/file.
-  # If a block is passed, calls it one for each barcode in the source directory.
+  # Add SHA256 entries to metadata for each source/objid/file.
+  # If a block is passed, calls it one for each objid in the source directory.
   # Must be called after #setup_source_directory.
   def checksum_source_directory
     metadata[:checksums] = {}
-    last_barcode = nil
+    last_objid = nil
     source_image_files.each do |image_file|
-      if block_given? && last_barcode != image_file.barcode
-        yield image_file.barcode
-      end
-      metadata[:checksums][image_file.barcode_file] = checksum(image_file)
-      last_barcode = image_file.barcode
+      yield image_file.objid if block_given? && last_objid != image_file.objid
+      metadata[:checksums][image_file.objid_file] = checksum(image_file)
+      last_objid = image_file.objid
     end
   end
 
@@ -221,19 +219,19 @@ class Shipment # rubocop:disable Metrics/ClassLength
 
     source_image_files.each do |image_file|
       yield image_file if block_given?
-      if checksums[image_file.barcode_file].nil?
+      if checksums[image_file.objid_file].nil?
         fixity[:added] << image_file
-      elsif checksums[image_file.barcode_file] != checksum(image_file)
+      elsif checksums[image_file.objid_file] != checksum(image_file)
         fixity[:changed] << image_file
       end
     end
 
-    checksums.keys.sort.each do |barcode_file|
-      components = barcode_file.split(File::SEPARATOR)
-      barcode = path_to_barcode(components[0..-2])
-      image_file = ImageFile.new(barcode,
-                                 File.join(source_directory, barcode_file),
-                                 barcode_file, components[-1])
+    checksums.keys.sort.each do |objid_file|
+      components = objid_file.split(File::SEPARATOR)
+      objid = path_to_objid(components[0..-2])
+      image_file = ImageFile.new(objid,
+                                 File.join(source_directory, objid_file),
+                                 objid_file, components[-1])
       yield image_file if block_given?
       fixity[:removed] << image_file unless File.exist? image_file.path
     end
@@ -243,25 +241,25 @@ class Shipment # rubocop:disable Metrics/ClassLength
   private
 
   # Traverse to a depth of PATH_COMPONENTS under shipment directory
-  def find_barcodes(dir = @dir)
+  def find_objids(dir = @dir)
     bars = []
     dirs = self.class.top_level_directory_entries(dir)
     dirs.each do |entry|
-      bars = (bars + find_barcodes_with_components(dir, [entry])).uniq
+      bars = (bars + find_objids_with_components(dir, [entry])).uniq
     end
     bars.sort
   end
 
-  def find_barcodes_with_components(dir, components) # rubocop:disable Metrics/MethodLength
+  def find_objids_with_components(dir, components) # rubocop:disable Metrics/MethodLength
     bars = []
     if components.count < self.class::PATH_COMPONENTS
       subdir = File.join(dir, components)
       self.class.subdirectories(subdir).each do |entry|
-        more_bars = find_barcodes_with_components(dir, components + [entry])
+        more_bars = find_objids_with_components(dir, components + [entry])
         bars = (bars + more_bars).uniq
       end
     elsif components.count == self.class::PATH_COMPONENTS
-      bars << path_to_barcode(components)
+      bars << path_to_objid(components)
     end
     bars
   end
@@ -276,7 +274,7 @@ class DLXSShipment < Shipment
   end
 
   # Returns an error message or nil
-  def validate_barcode(barcode)
-    /^.*?\.\d\d\d\d\.\d\d\d$/.match?(barcode) ? nil : 'invalid volume/number'
+  def validate_objid(objid)
+    /^.*?\.\d\d\d\d\.\d\d\d$/.match?(objid) ? nil : 'invalid volume/number'
   end
 end

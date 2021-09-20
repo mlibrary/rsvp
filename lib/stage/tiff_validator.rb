@@ -13,10 +13,10 @@ class TIFFValidator < Stage
   def run(agenda)
     return unless agenda.any?
 
-    files = image_files.select { |file| agenda.include? file.barcode }
+    files = image_files.select { |file| agenda.include? file.objid }
     @bar.steps = files.count
     files.each do |image_file|
-      @bar.next! image_file.barcode_file
+      @bar.next! image_file.objid_file
       tiffinfo = run_tiffinfo image_file
       next if tiffinfo.nil?
 
@@ -31,15 +31,15 @@ class TIFFValidator < Stage
     begin
       info = TIFF.new(image_file.path).info
     rescue StandardError => e
-      add_error Error.new(e.message, image_file.barcode, image_file.file)
+      add_error Error.new(e.message, image_file.objid, image_file.file)
       return nil
     end
     log info[:cmd], info[:time]
     info[:warnings].each do |err|
-      add_warning Error.new(err, image_file.barcode, image_file.file)
+      add_warning Error.new(err, image_file.objid, image_file.file)
     end
     info[:errors].each do |err|
-      add_error Error.new(err, image_file.barcode, image_file.file)
+      add_error Error.new(err, image_file.objid, image_file.file)
     end
     info
   end
@@ -83,6 +83,6 @@ class TIFFValidator < Stage
   end
 
   def image_error(image_file, err)
-    add_error Error.new(err, image_file.barcode, image_file.path)
+    add_error Error.new(err, image_file.objid, image_file.path)
   end
 end

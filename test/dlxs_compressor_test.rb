@@ -26,15 +26,15 @@ class DLXSCompressorTest < Minitest::Test
       stage = DLXSCompressor.new(shipment, config: opts.merge(@config))
       stage.run!
       tiff = File.join(shipment.directory,
-                       shipment.barcode_to_path(shipment.barcodes[0]),
+                       shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
       assert File.exist?(tiff), '00000001.tif exists'
       jp2 = File.join(shipment.directory,
-                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      shipment.objid_to_path(shipment.objids[0]),
                       '00000001.jp2')
       refute File.exist?(jp2), '00000001.jp2 does not exist'
       jp2 = File.join(shipment.directory,
-                      shipment.barcode_to_path(shipment.barcodes[0]),
+                      shipment.objid_to_path(shipment.objids[0]),
                       'p0000001.jp2')
       assert File.exist?(jp2), 'p0000001.jp2 exists'
     }

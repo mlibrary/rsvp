@@ -23,14 +23,14 @@ class Agenda
       if source_stage.fatal_error?
         agenda[stage.name.to_sym] = []
       else
-        agenda[stage.name.to_sym].delete_if do |barcode|
-          source_stage.error_barcodes.include? barcode
+        agenda[stage.name.to_sym].delete_if do |objid|
+          source_stage.error_objids.include? objid
         end
       end
     end
   end
 
-  # Stage name -> Array of barcodes that have had no errors in the current run
+  # Stage name -> Array of objids that have had no errors in the current run
   def for_stage(stage)
     agenda[stage.name.to_sym] || []
   end
@@ -41,7 +41,7 @@ class Agenda
 
   private
 
-  # Called once to create to-do list of barcodes for each stage.
+  # Called once to create to-do list of objids for each stage.
   # Initialized with any changes to fixity that have occurred since last run.
   def agenda
     return @agenda unless @agenda.nil?
@@ -49,19 +49,19 @@ class Agenda
     @agenda = {}
     todo = fixity_changes
     @stages.each do |stage|
-      todo.merge @shipment.barcodes unless stage.complete?
+      todo.merge @shipment.objids unless stage.complete?
       @agenda[stage.name.to_sym] = todo.to_a.sort
     end
     @agenda
   end
 
-  # Set of barcodes that have had fixity {added, removed, changed} changes
+  # Set of objids that have had fixity {added, removed, changed} changes
   def fixity_changes
     changes = Set.new
     fixity = @shipment.fixity_check
-    changes.merge fixity[:added].collect(&:barcode).compact
-    changes.merge fixity[:removed].collect(&:barcode).compact
-    changes.merge fixity[:changed].collect(&:barcode).compact
+    changes.merge fixity[:added].collect(&:objid).compact
+    changes.merge fixity[:removed].collect(&:objid).compact
+    changes.merge fixity[:changed].collect(&:objid).compact
     changes
   end
 end

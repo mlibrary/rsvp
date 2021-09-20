@@ -9,14 +9,14 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
   def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     return unless agenda.any?
 
-    files = image_files('jp2').select { |file| agenda.include? file.barcode }
+    files = image_files('jp2').select { |file| agenda.include? file.objid }
     @bar.steps = files.count
     files.each_with_index do |image_file, i|
-      @bar.step! i, image_file.barcode_file
+      @bar.step! i, image_file.objid_file
       begin
         handle_conversion image_file
       rescue StandardError => e
-        add_error Error.new(e.message, image_file.barcode, image_file.path)
+        add_error Error.new(e.message, image_file.objid, image_file.path)
       end
     end
   end
@@ -33,12 +33,12 @@ class DLXSCompressor < Stage # rubocop:disable Metrics/ClassLength
     expand_jp2 image_file.path, source
     tiff_to_pgm tmpdir
     pgm_to_bitonal tmpdir
-    source_image = File.join(shipment.barcode_to_path(image_file.barcode),
+    source_image = File.join(shipment.objid_to_path(image_file.objid),
                              final_image_name)
     copy_metadata image_file.path, bitonal, source_image
-    copy_on_success bitonal, final_image, image_file.barcode
+    copy_on_success bitonal, final_image, image_file.objid
     copy_on_success image_file.path, jp2_name(image_file.path),
-                    image_file.barcode
+                    image_file.objid
     delete_on_success image_file.path
   end
 
