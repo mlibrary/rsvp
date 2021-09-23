@@ -11,9 +11,9 @@ require 'config'
 require 'jhove'
 require 'string_color'
 
-options_data = [['-c', '--config-profile PROFILE', :config_profile,
+options_data = [['-c', '--config-profile=PROFILE', :config_profile,
                  'Configuration PROFILE (e.g., "dlxs")'],
-                ['-d', '--config-dir DIRECTORY', :config_dir,
+                ['-d', '--config-dir=DIRECTORY', :config_dir,
                  'Configuration directory DIRECTORY'],
                 ['-h', '--help', :help,
                  'Display this message and exit'],
