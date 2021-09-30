@@ -9,10 +9,8 @@ SimpleCov.start do
   end
 end
 
-APP_ROOT = File.expand_path('..', __dir__)
+require_relative '../rsvp'
 TEST_ROOT = File.expand_path(__dir__)
-$LOAD_PATH << File.join(APP_ROOT, 'lib')
-$LOAD_PATH << File.join(APP_ROOT, 'lib', 'stage')
 $LOAD_PATH << TEST_ROOT
 
 require 'minitest'
@@ -56,6 +54,7 @@ module Minitest
         test_shipment_class_name = 'TestShipment'
         opts = {}
         if type == 'DLXS'
+          require 'dlxs_shipment'
           shipment_class_name = 'DLXSShipment'
           test_shipment_class_name = 'DLXSTestShipment'
           opts = { config_profile: 'dlxs' }

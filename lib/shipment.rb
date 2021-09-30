@@ -264,17 +264,3 @@ class Shipment # rubocop:disable Metrics/ClassLength
     bars
   end
 end
-
-# Shipment directory class for DLXS nested id/volume/number directories
-class DLXSShipment < Shipment
-  PATH_COMPONENTS = 3
-  OBJID_SEPARATOR = '.'
-  def initialize(dir, metadata = nil)
-    super dir, metadata
-  end
-
-  # Returns an error message or nil
-  def validate_objid(objid)
-    /^.*?\.\d\d\d\d\.\d\d\d$/.match?(objid) ? nil : 'invalid volume/number'
-  end
-end
