@@ -11,9 +11,9 @@ require 'processor'
 require 'query_tool'
 require 'string_color'
 
-options_data = [['-c', '--config-profile PROFILE', :config_profile,
+options_data = [['-c', '--config-profile=PROFILE', :config_profile,
                  'Configuration PROFILE (e.g., "dlxs")'],
-                ['-d', '--config-dir DIRECTORY', :config_dir,
+                ['-d', '--config-dir=DIRECTORY', :config_dir,
                  'Configuration directory DIRECTORY'],
                 ['-h', '--help', :help,
                  'Display this message and exit'],
@@ -21,11 +21,11 @@ options_data = [['-c', '--config-profile PROFILE', :config_profile,
                  'Discard status.json and restart all stages'],
                 ['-v', '--verbose', :verbose,
                  'Run verbosely'],
-                [:OPTIONAL, '--tagger-scanner SCANNER', :tagger_scanner,
+                [:OPTIONAL, '--tagger-scanner=SCANNER', :tagger_scanner,
                  'Set scanner tag to SCANNER'],
-                [:OPTIONAL, '--tagger-software SOFTWARE', :tagger_software,
+                [:OPTIONAL, '--tagger-software=SOFTWARE', :tagger_software,
                  'Set scan software tag to SOFTWARE'],
-                [:OPTIONAL, '--tagger-artist ARTIST', :tagger_artist,
+                [:OPTIONAL, '--tagger-artist=ARTIST', :tagger_artist,
                  'Set artist tag to ARTIST']].freeze
 options = {}
 opts = OptionParser.new
