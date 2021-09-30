@@ -54,6 +54,7 @@ module Minitest
         test_shipment_class_name = 'TestShipment'
         opts = {}
         if type == 'DLXS'
+          require 'dlxs_shipment'
           shipment_class_name = 'DLXSShipment'
           test_shipment_class_name = 'DLXSTestShipment'
           opts = { config_profile: 'dlxs' }
