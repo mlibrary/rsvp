@@ -146,7 +146,7 @@ class QueryTool # rubocop:disable Metrics/ClassLength
     bad = stage.error_objids.count
     total = stage.objids.count
     errors = stage.errors.count
-    if bad.positive?
+    if bad.positive? || errors.positive?
       statuses << "#{bad}/#{total} #{pluralize(total, 'objid')} failed"
       statuses << "#{errors} #{pluralize(errors, 'error').red}"
     end

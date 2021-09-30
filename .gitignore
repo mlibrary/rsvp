@@ -36,6 +36,6 @@
 ##############################################################################
 # Ignore OS X Desktop Services Store files
 .DS_Store
-/bin
-coverage
+/coverage
 /config/*.local.yml
+/vendor

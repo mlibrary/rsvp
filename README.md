@@ -15,16 +15,9 @@ University of Michigan DCU.
 The minimum Ruby version is 2.7.4.
 
 ```
-$ git clone https://github.com/mlibrary/rsvp.git
-$ cd rsvp
-$ bundle install
-```
-
-On a server to which you do not have root access, this may be preferable:
-
-```
 mkdir -p vendor/bundle
-bundle install --path vendor/bundle
+bundle config set --local path 'vendor/bundle'
+bundle install
 ```
 
 For basic functionality when running outside Docker, the following packages
