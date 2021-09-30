@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'English'
+require 'optparse'
+
+require_relative '../rsvp'
+require 'processor'
+require 'query_tool'
+require 'string_color'
+
+options_data = [['-c', '--config-profile PROFILE', :config_profile,
+                 'Configuration PROFILE (e.g., "dlxs")'],
+                ['-d', '--config-dir DIRECTORY', :config_dir,
+                 'Configuration directory DIRECTORY'],
+                ['-h', '--help', :help,
+                 'Display this message and exit']].freeze
+options = {}
+opts = OptionParser.new
+opts.banner = "Usage: #{$PROGRAM_NAME} [options]" \
+              'SHIPMENT_DIRECTORY [SHIPMENT_DIRECTORY...]'
+options_data.each do |vals|
+  opts.on(vals[0], vals[1], vals[3]) do |v|
+    options[vals[2]] = v
+  end
+end
+
+begin
+  opts.parse!
+rescue OptionParser::InvalidOption => e
+  puts e.message.capitalize.red
+  puts opts.help
+  exit 1
+end
+
+if options[:help]
+  puts opts.help
+  exit 0
+end
+
+if ARGV.count.zero?
+  puts 'Missing required parameter SHIPMENT_DIRECTORY'.red
+  puts opts.help
+  exit 1
+end
+
+# Map of path to string
+statuses = {}
+
+ARGV.each do |arg|
+  dir = Pathname.new(arg).cleanpath.to_s
+  unless File.exist? dir
+    statuses[arg] = 'No such directory'.red
+    next
+  end
+  unless File.directory? dir
+    statuses[arg] = 'Not a directory'.red
+    next
+  end
+  begin
+    processor = Processor.new(dir, options)
+    unless processor.status_file?
+      statuses[arg] = 'Not a shipment'.red
+      next
+    end
+    tool = QueryTool.new(processor)
+    status = processor.errors.none? ? 'OK'.green : 'ERRORS'.red
+    objects = tool.pluralize processor.shipment.objids.count, 'object'
+    status += " (#{processor.shipment.objids.count} #{objects})"
+    statuses[arg] = status
+  rescue JSON::ParserError => e
+    statuses[arg] = "Can't parse #{shipment.status_file}: #{e}".red
+  end
+end
+
+statuses.each do |path, status|
+  puts "#{status.bold} #{path}"
+end

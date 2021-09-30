@@ -5,12 +5,10 @@ require 'English'
 require 'optparse'
 require 'readline'
 
-APP_ROOT = File.expand_path(__dir__)
-$LOAD_PATH << File.join(APP_ROOT, 'lib')
-$LOAD_PATH << File.join(APP_ROOT, 'lib', 'stage')
-require 'string_color'
+require_relative '../rsvp'
 require 'processor'
 require 'query_tool'
+require 'string_color'
 
 options_data = [['-c', '--config-profile PROFILE', :config_profile,
                  'Configuration PROFILE (e.g., "dlxs")'],

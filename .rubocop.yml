@@ -1,11 +1,13 @@
 AllCops:
   DisplayCopNames: true
   Include:
+    - 'bin/*'
     - '**/*.rb'
     - '**/Rakefile'
     - '**/config.ru'
   Exclude:
-    - 'bin/**/*'
+    - 'bin/.DS_Store'
+    - 'vendor/**/*'
   SuggestExtensions: false
 Gemspec/DateAssignment:
   Enabled: true
