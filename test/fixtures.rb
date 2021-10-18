@@ -13,7 +13,7 @@ module Fixtures
     },
     bad_16bps: {
       file: '10_10_1_16bps_400.tif',
-      description: '16bps image that will fail TIFFValidator and Compressor'
+      description: '16bps image that will fail Image Validator and Compressor'
     }
   }.freeze
   JP2_FIXTURES = {

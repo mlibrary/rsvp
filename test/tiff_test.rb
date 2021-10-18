@@ -35,6 +35,16 @@ class TIFFTest < Minitest::Test
     assert_nil info[:software]
   end
 
+  def test_info_fail
+    shipment = TestShipment.new(test_name, 'BC F bogus_file')
+    tiff = TIFF.new(File.join(shipment.directory,
+                              shipment.objid_to_path(shipment.objids.first),
+                              'bogus_file'))
+    assert_raises(StandardError, 'raises StandardError on bogus file') do
+      tiff.info
+    end
+  end
+
   def test_set
     shipment = TestShipment.new(test_name, 'BC T contone 1')
     tiff = TIFF.new(shipment.image_files.first.path)

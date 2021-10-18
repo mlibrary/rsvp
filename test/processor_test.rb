@@ -63,8 +63,8 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       end
       errs = processor.errors['Preflight'][processor.shipment.objids[0]]
       warnings = processor.warnings['Preflight'][processor.shipment.objids[0]]
-      assert errs.any? { |e| /no.TIFF/i.match? e.to_s },
-             'Preflight fails with no TIFFs error'
+      assert errs.any? { |e| /no.image.files/.match? e.to_s },
+             'Preflight fails with no images error'
       assert warnings.any? { |e| /\.DS_Store/.match? e.to_s },
              'Preflight warns about .DS_Store'
     }
@@ -95,7 +95,7 @@ class ProcessorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       end
       processor.write_status_file
       processor = Processor.new(test_shipment.directory, opts.merge(@options))
-      errs = processor.errors['TIFF Validator'][processor.shipment.objids[0]]
+      errs = processor.errors['Image Validator'][processor.shipment.objids[0]]
       assert_kind_of Error, errs[0],
                      'Error class reconstituted from status.json'
     }

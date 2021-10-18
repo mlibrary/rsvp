@@ -17,8 +17,8 @@ module RSVP
     ENV['HOME'] = tmpdir
     ENV['BUNDLE_GEMFILE'] ||= File.join(RSVP::APP_ROOT, 'Gemfile')
     require 'bundler/setup'
-    ENV['HOME'] = save_home
   ensure
+    ENV['HOME'] = save_home
     FileUtils.rm_rf tmpdir
   end
 
