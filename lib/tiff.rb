@@ -3,7 +3,7 @@
 
 require 'command'
 
-# TIFF Validation Stage
+# TIFF info and tagging utility
 class TIFF
   TIFFTAG_DOCUMENTNAME = 269
   TIFFTAG_MAKE = 271

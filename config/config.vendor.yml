@@ -10,12 +10,6 @@ stages:
   - name: Pagination Check
     class: PaginationCheck
     file: pagination_check
-  - name: Tagger
-    class: Tagger
-    file: tagger
-  - name: Compressor
-    class: Compressor
-    file: compressor
   - name: Postflight
     class: Postflight
     file: postflight

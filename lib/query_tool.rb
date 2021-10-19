@@ -9,7 +9,7 @@ require 'processor'
 
 # Facility for running command-line processor/shipment queries and commands
 class QueryTool # rubocop:disable Metrics/ClassLength
-  attr_accessor :processor
+  attr_reader :processor
 
   def initialize(processor)
     @processor = processor
@@ -49,7 +49,7 @@ class QueryTool # rubocop:disable Metrics/ClassLength
       next if args.count.positive? && !args.include?(objid)
 
       puts (objid.nil? ? '(General)' : objid).bold
-      errs[objid].each_key.each do |stage|
+      errs[objid].each_key do |stage|
         puts stage.brown
         errs[objid][stage].each do |err|
           unless err.path.nil?
@@ -69,7 +69,7 @@ class QueryTool # rubocop:disable Metrics/ClassLength
       next if args.count.positive? && !args.include?(objid)
 
       puts (objid.nil? ? '(General)' : objid).bold
-      warnings[objid].each_key.each do |stage|
+      warnings[objid].each_key do |stage|
         puts stage.brown
         warnings[objid][stage].each do |err|
           unless err.path.nil?
@@ -132,7 +132,7 @@ class QueryTool # rubocop:disable Metrics/ClassLength
   def status_status(stage)
     if stage.end.nil?
       'not yet run'.italic
-    elsif stage.fatal_error?
+    elsif stage.fatal_error? || stage.error_objids.count == stage.objids.count
       'FAIL'.red
     elsif stage.errors.count.zero?
       'PASS'.green

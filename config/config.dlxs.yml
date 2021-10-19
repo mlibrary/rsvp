@@ -4,9 +4,9 @@ stages:
   - name: Preflight
     class: Preflight
     file: preflight
-  - name: TIFF Validator
-    class: TIFFValidator
-    file: tiff_validator
+  - name: Image Validator
+    class: ImageValidator
+    file: image_validator
   - name: Pagination Check
     class: PaginationCheck
     file: pagination_check

@@ -2,9 +2,9 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require 'tiff_validator'
+require 'image_validator'
 
-class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+class ImageValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def setup
     @config = Config.new({ no_progress: true })
   end
@@ -17,7 +17,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir)
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       refute_nil stage, 'stage successfully created'
     }
     generate_tests 'new', test_proc
@@ -27,7 +27,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1 T contone 2')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       stage.run!
       assert_equal(0, stage.errors.count, 'stage runs without errors')
     }
@@ -38,7 +38,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T bad_16bps 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       stage.run!
       assert_equal(1, stage.errors.count, '16bps TIFF rejected')
     }
@@ -49,7 +49,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
                        shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
@@ -65,7 +65,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
                        shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
@@ -81,7 +81,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T bitonal 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
                        shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
@@ -97,7 +97,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
                        shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
@@ -113,7 +113,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
                        shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')
@@ -129,7 +129,7 @@ class TIFFValidatorTest < Minitest::Test # rubocop:disable Metrics/ClassLength
     test_proc = proc { |shipment_class, test_shipment_class, dir, opts|
       test_shipment = test_shipment_class.new(dir, 'BC T contone 1')
       shipment = shipment_class.new(test_shipment.directory)
-      stage = TIFFValidator.new(shipment, config: @config.merge(opts))
+      stage = ImageValidator.new(shipment, config: @config.merge(opts))
       tiff = File.join(shipment.directory,
                        shipment.objid_to_path(shipment.objids[0]),
                        '00000001.tif')

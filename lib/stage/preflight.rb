@@ -9,7 +9,16 @@ require 'stage'
 # The only changes this stage makes to the filesystem is deletion
 # of Thumbs.db and .DS_Store
 class Preflight < Stage
-  TIFF_REGEX = /^\d{8}\.tif$/.freeze
+  TIFF_REGEX = /^\d{8}\.tif$/i.freeze
+  JP2_REGEX = /^\d{8}\.jp2$/i.freeze
+
+  # NOTE: currently there is no config to tell the processor to only look
+  # for TIFF files and emit an error on JP2 files. The simplest approach
+  # would probably be to put a list of permitted image file extensions
+  # in the YML config.
+  def self.image_file?(file)
+    TIFF_REGEX.match?(file) || JP2_REGEX.match?(file)
+  end
 
   def self.removable_files
     %w[.DS_Store Thumbs.db]
@@ -71,7 +80,7 @@ class Preflight < Stage
   # and a few other exceptions grandfathered by just_do_everything.sh
   # No directories are allowed
   def validate_objid_directory(objid) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    have_tiff = false
+    have_image = false
     objid_directory = shipment.objid_directory(objid)
     Dir.entries(objid_directory).sort.each do |entry|
       next if %w[. ..].include? entry
@@ -79,8 +88,8 @@ class Preflight < Stage
       path = File.join(objid_directory, entry)
       if File.directory? path
         add_error Error.new("illegal objid subdirectory '#{entry}'", objid)
-      elsif self.class::TIFF_REGEX.match? entry
-        have_tiff = true
+      elsif self.class.image_file? entry
+        have_image = true
       elsif self.class.ignorable_files.include? entry
         add_warning Error.new('file ignored', objid, entry)
       elsif self.class.removable_files.include? entry
@@ -90,6 +99,6 @@ class Preflight < Stage
         add_error Error.new('unknown file', objid, entry)
       end
     end
-    add_error Error.new('no TIFF files found', objid) unless have_tiff
+    add_error Error.new('no image files found', objid) unless have_image
   end
 end
