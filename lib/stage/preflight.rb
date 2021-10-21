@@ -11,6 +11,9 @@ require 'stage'
 class Preflight < Stage
   TIFF_REGEX = /^\d{8}\.tif$/i.freeze
   JP2_REGEX = /^\d{8}\.jp2$/i.freeze
+  REMOVABLE_FILES = %w[.DS_Store Thumbs.db].freeze
+  IGNORABLE_FILES = %w[aiim.tif aiim.jp2 notes.txt rit.tif rit.jp2
+                       checksum.md5 prodnote.tif].freeze
 
   # NOTE: currently there is no config to tell the processor to only look
   # for TIFF files and emit an error on JP2 files. The simplest approach
@@ -21,15 +24,14 @@ class Preflight < Stage
   end
 
   def self.removable_files
-    %w[.DS_Store Thumbs.db]
+    REMOVABLE_FILES
   end
 
   def self.ignorable_files
-    %w[aiim.tif aiim.jp2 notes.txt rit.tif
-       checksum.md5 prodnote.tif]
+    IGNORABLE_FILES
   end
 
-  def run(agenda) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def run(agenda) # rubocop:disable Metrics/AbcSize
     shipment.metadata[:initial_barcodes] = shipment.objids
     if shipment.metadata[:initial_barcodes].none?
       add_error Error.new("no objids in #{shipment_directory}")
@@ -37,18 +39,10 @@ class Preflight < Stage
     @bar.steps = steps agenda
     @bar.next! "validate #{File.split(shipment_directory)[-1]}"
     validate_shipment_directory
-    shipment.setup_source_directory do |objid|
-      @bar.next! "setup source/#{objid}"
-    end
-    shipment.checksum_source_directory do |objid|
-      @bar.next! "checksum source/#{objid}"
-    end
-    agenda.each do |objid|
-      err = shipment.validate_objid objid
-      add_warning Error.new(err, objid) unless err.nil?
-      @bar.next! "validate #{objid}"
-      validate_objid_directory objid
-    end
+    validate_objects agenda
+    return if fatal_error?
+
+    setup_source_directory
   end
 
   private
@@ -56,6 +50,15 @@ class Preflight < Stage
   def steps(agenda)
     1 + shipment.objids.count + agenda.count +
       (File.directory?(source_directory) ? 0 : shipment.objids.count)
+  end
+
+  def validate_objects(agenda)
+    agenda.each do |objid|
+      err = shipment.validate_objid objid
+      add_warning Error.new(err, objid) unless err.nil?
+      @bar.next! "validate #{objid}"
+      validate_objid_directory objid
+    end
   end
 
   # A shipment directory is valid if it contains only objid directories,
@@ -100,5 +103,14 @@ class Preflight < Stage
       end
     end
     add_error Error.new('no image files found', objid) unless have_image
+  end
+
+  def setup_source_directory
+    shipment.setup_source_directory do |objid|
+      @bar.next! "setup source/#{objid}"
+    end
+    shipment.checksum_source_directory do |objid|
+      @bar.next! "checksum source/#{objid}"
+    end
   end
 end
