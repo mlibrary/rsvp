@@ -55,7 +55,7 @@ class JHOVE # rubocop:disable Metrics/ClassLength
   private
 
   def feed_validate_script
-    components = ['perl', @config[:feed_validate_script], 'google mdp', @dir]
+    components = ["docker run --rm -v '#{@dir}:/images' ghcr.io/hathitrust/feed perl /usr/local/feed/bin/validate_images.pl google mdp /images"]
     components.join ' '
   end
 
