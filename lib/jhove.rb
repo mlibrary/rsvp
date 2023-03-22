@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'pathname'
+
 require 'command'
 require 'error'
 require 'symbolize'
@@ -55,8 +57,29 @@ class JHOVE # rubocop:disable Metrics/ClassLength
   private
 
   def feed_validate_script
-    components = ['perl', @config[:feed_validate_script], 'google mdp', @dir]
-    components.join ' '
+    # If this is configured, simply call it without Docker.
+    # Otherwise invoke the standard entry point.
+    # Running under Docker is slow!
+    # May be able to use something like https://github.com/upserve/docker-api
+    # to reuse container.
+    if @config[:feed_validate_script]
+      ['perl', @config[:feed_validate_script], 'simple test', @dir]
+    else
+      feed_validate_script_docker
+    end.join ' '
+  end
+
+  def feed_validate_script_docker
+    local = Pathname.new(@dir)
+    mount = Pathname.new('/images') + local.basename
+    [
+      "docker run --rm -v '#{local}:#{mount}'",
+      'ghcr.io/hathitrust/feed',
+      'perl',
+      '/usr/local/feed/bin/validate_images.pl',
+      'simple test',
+      mount.to_s
+    ]
   end
 
   def process_feed_validate_output

@@ -1,4 +1,3 @@
-feed_validate_script: '/l/local/feed/bin/validate_images.pl'
 shipment_class: DLXSShipment
 stages:
   - name: Preflight
