@@ -62,6 +62,8 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     final_image = File.join(File.dirname(image_file.path), final_image_name)
     document_name = File.join(shipment.objid_to_path(image_file.objid),
                               final_image_name)
+    on_disk_temp_image = final_image.sub(shipment.directory, shipment.tmp_directory)
+    system("mkdir -p #{File.dirname(on_disk_temp_image)}")
 
     # We don't want any XMP metadata to be copied over on its own. If
     # it's been a while since we last ran exiftool, this might take a sec.
@@ -92,7 +94,9 @@ class Compressor < Stage # rubocop:disable Metrics/ClassLength
     # the XMP data needs to reflect that (previously, we were
     # taking that info from the original image).
     copy_jp2_alphaless_metadata(sparse, new_image) if tiffinfo[:alpha]
-    copy_on_success new_image, final_image, image_file.objid
+    system("cp #{new_image} #{on_disk_temp_image}")
+    system("rm -r #{tmpdir}/*")
+    copy_on_success on_disk_temp_image, final_image, image_file.objid
     delete_on_success image_file.path, image_file.objid
   end
 

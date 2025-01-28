@@ -200,8 +200,9 @@ class Stage # rubocop:disable Metrics/ClassLength
     unless File.directory? shipment.tmp_directory
       Dir.mkdir shipment.tmp_directory
     end
+    Dir.mkdir "/tmp/rsvp" unless File.directory? "/tmp/rsvp"
     prefix = self.class.to_s + prefix
-    (@tempdirs ||= []) << Dir.mktmpdir(prefix, shipment.tmp_directory)
+    (@tempdirs ||= []) << Dir.mktmpdir(prefix, "/tmp/rsvp")
     @tempdirs[-1]
   end
 
